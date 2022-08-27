@@ -1,3 +1,5 @@
+import YAML from 'yaml'
+
 
 export default {
 
@@ -48,7 +50,28 @@ export default {
 
     'hash':(string_,type_)=> window.main.hash(string_,type_),
 
-
+    'jsonIndent':(jsonContent_)=> {
+        try{
+            return window.main.jsonIndent(jsonContent_)
+        }catch(e){
+            return 'Error:'+e.message;   
+        }
+    },
+    
+    'htmlEncode':(text_)=>window.main.htmlEncode(text_),
+    'htmlDecode':(text_)=>window.main.htmlDecode(text_),
+   
+    'convertJsonToYaml':(text_)=>YAML.stringify(JSON.parse(text_)),
+    'convertYamlToJson':(text_)=>JSON.stringify( YAML.parse(text_)),
+   
+    
+    'xmlFormat':(xmlContent_)=> {
+        try{
+            return window.main.xmlFormat(xmlContent_)
+        }catch(e){
+            return 'Error:'+e.message;   
+        }
+    },
     
 
 }

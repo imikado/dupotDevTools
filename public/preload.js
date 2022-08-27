@@ -5,6 +5,7 @@ const {  join } = require('path')
 const { execSync } = require("child_process");
 
 var crypto = require('crypto')
+const HTMLDecoderEncoder = require("html-encoder-decoder");
 
 
 const dirs = p => readdirSync(p).filter(f => statSync(join(p, f)).isDirectory())
@@ -57,6 +58,23 @@ contextBridge.exposeInMainWorld('main', {
     shasum.update(string_)
     return shasum.digest('hex');
   },
+
+  jsonIndent: (jsonContent_) => {
+    return JSON.stringify( JSON.parse(jsonContent_), null,4);
+  },
+
+  htmlEncode: (text_) => {
+    return HTMLDecoderEncoder.encode(text_);
+  },
+  htmlDecode: (text_) => {
+    return HTMLDecoderEncoder.decode(text_);
+  },
+  xmlFormat:(text_)=>{
+    var format = require('xml-formatter');
+
+    return format(text_);
+  }
+
 
 
    

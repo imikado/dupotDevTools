@@ -1,7 +1,0 @@
-{
-
-    "description":"Convert HTML code to Text",
-
-    "command":"html2text input output"
-
-}
