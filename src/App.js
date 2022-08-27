@@ -1,25 +1,38 @@
-import logo from './logo.svg';
+
 import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
-function App() {
+
+import { Routes, Route } from "react-router-dom";
+
+
+import { Col, Container, Row } from 'react-bootstrap';
+
+import NavLeft from './components/NavLeft';
+import Home from './components/Home';
+import FeaturesList from './components/FeaturesList';
+
+import Html2Text from './features/html/html2text/Html2Text'
+import Page404 from './components/Page404';
+
+export default function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
-}
+    <Container>
+      <Row>
+        <Col><NavLeft /></Col>
+        <Col>
+          <Routes>
+            <Route path="/" element={<Home />} />
 
-export default App;
+            <Route path="/section/html/html2text" element={<Html2Text />} />
+
+            
+            <Route path="/section/:section" element={<FeaturesList />} />
+
+            <Route path="*" element={<Page404 />} />
+          </Routes>
+        </Col>
+      </Row>
+    </Container>
+    );
+}
