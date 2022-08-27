@@ -1,4 +1,5 @@
-import { Button, ButtonGroup } from "react-bootstrap";
+import { Button, ButtonGroup, ListGroup } from "react-bootstrap";
+import { Link } from "react-router-dom";
 import featuresApi from "../apis/featuresApi";
 
 
@@ -6,12 +7,18 @@ export default function NavLeft(){
 
   const dirList= featuresApi.getSectionsList()
 
+
     return (
-        <ButtonGroup vertical>
-         {dirList.map( (name)=><Button key={name} href={"/section/"+name} >{name}</Button>)}
-     
-      </ButtonGroup>
+      
+      <ListGroup  variant="flush">
+        
+
+        {dirList.map( (name)=><ListGroup.Item as={Link} key={name} to={"section/"+name} href={"#"+name} >{name}</ListGroup.Item>)}
+
+      </ListGroup>
     )
 
 }
+
+
 

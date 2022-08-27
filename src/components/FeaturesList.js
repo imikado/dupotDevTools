@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button } from 'react-bootstrap';
-import { useParams } from 'react-router-dom';
+import { Button, Card } from 'react-bootstrap';
+import { Link, useParams } from 'react-router-dom';
 import featuresApi from '../apis/featuresApi';
 
 
@@ -13,11 +13,18 @@ export default function FeaturesList() {
     const featuresList=featuresApi.getFeaturesListInSection( section );
 
   return (
-    <div>
+    <>
         {featuresList.map( 
-            (value) => 
-                <Button key={value} href={"/section/"+section+"/"+value}>{value}</Button>)}
-      
-    </div>
+            (featureObj) =>  
+
+            <Card key={featureObj.name} style={{ width: '18rem' }}>
+              <Card.Header>{featureObj.name}</Card.Header>
+              <Card.Body  >
+                <Card.Text>{featureObj.description}</Card.Text> 
+                <Button variant="primary" href={"/section/"+section+"/"+featureObj.name} to={"#section_"+section+'_'+featureObj.name}>Go</Button>
+              </Card.Body>
+            </Card>
+      )}
+    </>
   );
 }

@@ -4,6 +4,9 @@ const { readdirSync, statSync , writeFileSync,readFileSync,unlinkSync } = requir
 const {  join } = require('path')
 const { execSync } = require("child_process");
 
+var crypto = require('crypto')
+
+
 const dirs = p => readdirSync(p).filter(f => statSync(join(p, f)).isDirectory())
 
 const tempDirectory='/tmp';
@@ -37,6 +40,9 @@ contextBridge.exposeInMainWorld('main', {
   getTempFilePath: (filename_) => {
     return join(tempDirectory,filename_);
   },
+  getJsonFromFeatureFile:(section_,featureDir_,jsonFilename_)=>{
+    return  JSON.parse(readFileSync( join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_)));
+  },
 
 
   launchCommand: (command_)  => {
@@ -44,7 +50,15 @@ contextBridge.exposeInMainWorld('main', {
     return execSync( command_).toString();
   
 
-  }
+  },
+
+  hash: (string_,type_)=>{
+    var shasum = crypto.createHash(type_)
+    shasum.update(string_)
+    return shasum.digest('hex');
+  },
+
+
    
   // we can also expose variables, not just functions
 })

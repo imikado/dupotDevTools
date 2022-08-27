@@ -7,8 +7,16 @@ export default {
     },
 
     'getFeaturesListInSection':(section)=>{
-        return window.main.getDirectoryList(window.main.join(['..','src','features',section]));
+        let featureList=[];
+        let dirList= window.main.getDirectoryList(window.main.join(['..','src','features',section]));
+        for(let dirKeyLoop in dirList){
+            let dirLoop=dirList[dirKeyLoop];
+            let featureLoop=window.main.getJsonFromFeatureFile(section,dirLoop,'card.json');
+            featureLoop.name=dirLoop;
 
+            featureList.push(featureLoop);
+        }
+        return featureList; 
     },
 
     'getTempFilePath':(filename_)=>{
@@ -36,7 +44,10 @@ export default {
             minutes='0'+minutes;
         }
         return hours+':'+minutes;
-    }
+    },
+
+    'hash':(string_,type_)=> window.main.hash(string_,type_),
+
 
     
 
