@@ -41,16 +41,39 @@ contextBridge.exposeInMainWorld('main', {
   getTempFilePath: (filename_) => {
     return join(tempDirectory,filename_);
   },
+
+  //feature
   getJsonFromFeatureFile:(section_,featureDir_,jsonFilename_)=>{
+    console.log(join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_));
     return  JSON.parse(readFileSync( join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_)));
   },
+  saveFeatureJsonFile:(section_,featureDir_,jsonFilename_,obj_)=>{
+    
+    let content=JSON.stringify(obj_);
 
+    writeFileSync( join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_), content, err => {
+      if (err) {
+        console.error(err);
+      }
+      // file written successfully
+    });
+
+  },
+
+  
 
   launchCommand: (command_)  => {
 
-    return execSync( command_).toString();
-  
-
+    try{
+      console.log(command_);
+      let output= execSync( command_).toString();
+      return output;
+    }catch(e){
+      if( e.status!=0){
+        return 'Error: '+e.message;  
+      }
+      return 'Error uncatched';
+    }
   },
 
   hash: (string_,type_)=>{

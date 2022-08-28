@@ -48,6 +48,13 @@ export default {
         return hours+':'+minutes;
     },
 
+    'readJsonSettings':(section_,feature_)=>{
+        return window.main.getJsonFromFeatureFile(section_,feature_,'settings.json');
+    },
+    'saveJsonSettings':(section_,feature_,settingsObj_)=>{
+        return window.main.saveFeatureJsonFile(section_,feature_,'settings.json', settingsObj_);
+    },
+
     'hash':(string_,type_)=> window.main.hash(string_,type_),
 
     'jsonIndent':(jsonContent_)=> {
@@ -74,5 +81,5 @@ export default {
     },
     
 
-}
+};
 
