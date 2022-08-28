@@ -1,5 +1,5 @@
 import YAML from 'yaml'
-
+import { format as SqlFormat } from 'sql-formatter';
 
 export default {
 
@@ -79,6 +79,22 @@ export default {
             return 'Error:'+e.message;   
         }
     },
+    'sqlFormat':(sqlContent_)=> {
+        try{
+            
+            return SqlFormat(sqlContent_,{
+                language: 'spark',
+                tabWidth: 2,
+                keywordCase: 'upper',
+                linesBetweenQueries: 2,
+              });
+        }catch(e){
+            return 'Error:'+e.message;   
+        }
+    },
+
+
+    
     
 
 };
