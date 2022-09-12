@@ -6,6 +6,8 @@ const isDev = require('electron-is-dev');
 function createWindow() {
   // Create the browser window.
   const win = new BrowserWindow({
+    autoHideMenuBar:true,
+
     width: 900,
     height: 600,
     webPreferences: {

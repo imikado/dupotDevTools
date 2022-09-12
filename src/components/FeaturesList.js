@@ -1,9 +1,10 @@
 import React from 'react';
 import { Button, Card } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
-import featuresApi from '../apis/featuresApi';
 
+import FeatureApi from '../apis/FeatureApi';
 
+const featuresApi=new FeatureApi();
 
 export default function FeaturesList() {
 

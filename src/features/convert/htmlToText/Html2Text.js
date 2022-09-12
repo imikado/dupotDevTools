@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { Button, Col, Form, Row } from "react-bootstrap";
-import featuresApi from "../../../apis/featuresApi";
+
+import FileSystemApi from "../../../apis/FileSystemApi";
+import DatetimeApi from "../../../apis/DatetimeApi";
+
 import Settings from "./Settings";
+import card from "./card.json";
+
+const datetimeApi=new DatetimeApi();
+
+const filesystemApi=new FileSystemApi();
+filesystemApi.loadCard(card);
 
 export default function Html2Text() {
   const [input, setInput] = useState("");
@@ -13,8 +22,8 @@ export default function Html2Text() {
 
 
   //command
-  const inputFile = featuresApi.getTempFilePath("html2text.input");
-  const outputFile = featuresApi.getTempFilePath("html2text.output");
+  const inputFile = filesystemApi.getTempFilePath("input");
+  const outputFile = filesystemApi.getTempFilePath("output");
   const command= settingsObj.binaryPath+ " -o " + outputFile+" " + inputFile 
 
   //settings
@@ -26,20 +35,20 @@ export default function Html2Text() {
 
 
   const saveSettings=(settingsObj)=>{
-    featuresApi.saveJsonSettings('convert','htmlToText',settingsObj);
+    filesystemApi.saveJsonSettings(settingsObj);
   }
 
   useEffect(() => {
-    setSettingsObj(featuresApi.readJsonSettings('convert','htmlToText'));
+    setSettingsObj(filesystemApi.readJsonSettings());
     
   },[]);
 
   const convert = () => {
-    featuresApi.writeTempFile(inputFile, input);
+    filesystemApi.writeTempFile(inputFile, input);
 
-    let outputError=featuresApi.launchCommand(command);
+    let outputError=filesystemApi.launchCommand(command);
 
-    var outputConverted = featuresApi.readTempFile(outputFile);
+    var outputConverted = filesystemApi.readTempFile(outputFile);
 
     if(outputError){
       setOutput(outputError);
@@ -48,7 +57,7 @@ export default function Html2Text() {
       setOutput(outputConverted);
     
     }
-    setStatus("Converted at " + featuresApi.getTimeToString());
+    setStatus("Converted at " + datetimeApi.getTimeToString());
   };
 
   return (

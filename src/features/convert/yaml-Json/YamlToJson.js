@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { Button, Form } from "react-bootstrap";
-import featuresApi from "../../../apis/featuresApi";
+import DatetimeApi from "../../../apis/DatetimeApi";
+import TextApi from "../../../apis/TextApi";
+
+const datetimeApi=new DatetimeApi();
+const textApi=new TextApi();
 
 export default function YamlToJson() {
   const [input, setInput] = useState("");
@@ -9,14 +13,14 @@ export default function YamlToJson() {
   const [status, setStatus] = useState();
 
   const convertToYaml = () => {
-    setOutput(featuresApi.convertJsonToYaml(input));
+    setOutput(textApi.convertJsonToYaml(input));
 
-    setStatus('Converted at '+featuresApi.getTimeToString());
+    setStatus('Converted at '+datetimeApi.getTimeToString());
   };
   const convertToJson = () => {
-    setOutput(featuresApi.convertYamlToJson(input));
+    setOutput(textApi.convertYamlToJson(input));
 
-    setStatus('Converted at '+featuresApi.getTimeToString());
+    setStatus('Converted at '+datetimeApi.getTimeToString());
   };
 
   return (

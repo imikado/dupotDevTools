@@ -1,6 +1,7 @@
 {
-
-    "description":"Convert JSON to/from YAML "
-
-
+    "description": "Convert JSON to/from YAML ",
+    "section": {
+        "path": "convert"
+    },
+    "path": "yaml-Json"
 }

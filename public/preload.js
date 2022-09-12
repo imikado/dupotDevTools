@@ -12,7 +12,7 @@ const dirs = p => readdirSync(p).filter(f => statSync(join(p, f)).isDirectory())
 
 const tempDirectory='/tmp';
 
-contextBridge.exposeInMainWorld('main', {
+contextBridge.exposeInMainWorld('nodejs', {
 
   join: (pathList) => {
 

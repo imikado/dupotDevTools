@@ -1,3 +1,7 @@
 {
-    "description":"Indent json"
+    "description": "Indent json",
+    "section": {
+        "path": "formating"
+    },
+    "path": "jsonFormat"
 }

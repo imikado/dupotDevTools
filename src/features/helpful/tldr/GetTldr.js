@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { Button, Card, Col, Form, Row } from "react-bootstrap";
-import featuresApi from "../../../apis/featuresApi";
+
 import Settings from "./Settings";
+import card from "./card.json";
+
+import FileSystemApi from "../../../apis/FileSystemApi";
+import DatetimeApi from "../../../apis/DatetimeApi";
+
+const filesytemApi=new FileSystemApi();
+filesytemApi.loadCard(card);
+
+const datetimeApi=new DatetimeApi();
 
 const Convert = require('ansi-to-html');
 
@@ -31,17 +40,17 @@ export default function GetTldr() {
 
 
   const saveSettings=(settingsObj)=>{
-    featuresApi.saveJsonSettings(section,feature,settingsObj);
+    filesytemApi.saveJsonSettings(settingsObj);
   }
 
   useEffect(() => {
-    setSettingsObj(featuresApi.readJsonSettings(section,feature));
+    setSettingsObj(filesytemApi.readJsonSettings());
     
   },[]);
 
   const convert = () => {
 
-    let outputError=featuresApi.launchCommand(command+ " "+input);
+    let outputError=filesytemApi.launchCommand(command+ " "+input);
 
 
     var convert = new Convert({
@@ -49,7 +58,7 @@ export default function GetTldr() {
      })
       setOutput(convert.toHtml(outputError));
 
-    setStatus("Displayed at " + featuresApi.getTimeToString());
+    setStatus("Displayed at " + datetimeApi.getTimeToString());
   };
 
   return (

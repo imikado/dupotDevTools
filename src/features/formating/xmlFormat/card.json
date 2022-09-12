@@ -1,3 +1,7 @@
 {
-    "description":"Indent XML"
+    "description": "Indent XML",
+    "section": {
+        "path": "formating"
+    },
+    "path": "xmlFormat"
 }

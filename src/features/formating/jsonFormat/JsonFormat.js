@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { Button, Form } from "react-bootstrap";
-import featuresApi from "../../../apis/featuresApi";
+
+import DatetimeApi from "../../../apis/DatetimeApi";
+import TextApi from "../../../apis/TextApi";
+
+const textApi=new TextApi();
+const datetimeApi=new DatetimeApi();
 
 export default function JsonFormat() {
   const [input, setInput] = useState("");
@@ -10,7 +15,7 @@ export default function JsonFormat() {
 
   const convert = () => {
 
-    var outputConverted=featuresApi.jsonIndent(input);
+    var outputConverted=textApi.jsonIndent(input);
 
     setOutput('');
     try{
@@ -18,7 +23,7 @@ export default function JsonFormat() {
     }catch(e){
       console.log('Error'+e.message);
     }
-    setStatus('Converted at '+featuresApi.getTimeToString());
+    setStatus('Converted at '+datetimeApi.getTimeToString());
   };
 
   return (

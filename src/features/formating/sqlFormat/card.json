@@ -1,3 +1,7 @@
 {
-    "description":"Indent SQL"
+    "description": "Indent SQL",
+    "section": {
+        "path": "formating"
+    },
+    "path": "sqlFormat"
 }

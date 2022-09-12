@@ -1,7 +1,8 @@
 {
-
-    "description":"Convert HTML to Text",
-
-    "comment":"need html2text on your computer"
-
+    "description": "Convert HTML to Text",
+    "comment": "need html2text on your computer",
+    "section": {
+        "path": "convert"
+    },
+    "path": "htmlToText"
 }

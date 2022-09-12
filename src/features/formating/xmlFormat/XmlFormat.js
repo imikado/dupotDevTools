@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { Button, Form } from "react-bootstrap";
-import featuresApi from "../../../apis/featuresApi";
+
+import DatetimeApi from "../../../apis/DatetimeApi";
+import TextApi from "../../../apis/TextApi";
+
+const datetimeApi=new DatetimeApi();
+const textApi=new TextApi();
 
 export default function XmlFormat() {
   const [input, setInput] = useState("");
@@ -10,7 +15,7 @@ export default function XmlFormat() {
 
   const convert = () => {
 
-    var outputConverted=featuresApi.xmlFormat(input);
+    var outputConverted=textApi.xmlFormat(input);
 
     setOutput('');
     try{
@@ -18,7 +23,7 @@ export default function XmlFormat() {
     }catch(e){
       console.log('Error'+e.message);
     }
-    setStatus('Formated at '+featuresApi.getTimeToString());
+    setStatus('Formated at '+datetimeApi.getTimeToString());
   };
 
   return (

@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
-import featuresApi from '../../../apis/featuresApi';
+
+import TextApi from '../../../apis/TextApi';
+import DatetimeApi from '../../../apis/DatetimeApi';
+
+const textApi=new TextApi();
+const datetimeApi=new DatetimeApi();
+
 
 export default function Hash() {
   const [input, setInput] = useState("");
@@ -12,11 +18,11 @@ export default function Hash() {
 
   const convert = () => {
    
-    setOutputMd5(featuresApi.hash(input,'md5'))
-    setOutputSha1(featuresApi.hash(input,'sha1'))
-    setOutputSha256(featuresApi.hash(input,'sha256'))
+    setOutputMd5(textApi.hash(input,'md5'))
+    setOutputSha1(textApi.hash(input,'sha1'))
+    setOutputSha256(textApi.hash(input,'sha256'))
 
-    setStatus('Converted at '+featuresApi.getTimeToString());
+    setStatus('Converted at '+datetimeApi.getTimeToString());
   };
 
   const resetOutput= () => {

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
-import featuresApi from '../../../apis/featuresApi';
+import DatetimeApi from '../../../apis/DatetimeApi';
+
+const datetimeApi=new DatetimeApi();
 
 export default function UrlEncoding() {
   const [input, setInput] = useState("");
@@ -12,13 +14,13 @@ export default function UrlEncoding() {
    
     setOutput(encodeURI(input))
 
-    setStatus('Encoding at '+featuresApi.getTimeToString());
+    setStatus('Encoding at '+datetimeApi.getTimeToString());
   };
   const decode = () => {
    
     setOutput(decodeURI(input))
 
-    setStatus('Decoding at '+featuresApi.getTimeToString());
+    setStatus('Decoding at '+datetimeApi.getTimeToString());
   };
 
   const resetOutput= () => {

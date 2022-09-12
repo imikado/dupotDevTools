@@ -1,3 +1,7 @@
 {
-    "description":"Display very short man page for command"
+    "description": "Display very short man page for command",
+    "section": {
+        "path": "helpful"
+    },
+    "path": "tldr"
 }
