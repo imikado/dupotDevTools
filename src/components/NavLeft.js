@@ -1,13 +1,13 @@
 import { ListGroup } from "react-bootstrap";
 import { Link } from "react-router-dom";
 
-import FeatureApi from '../apis/FeatureApi';
+import AppApi from '../apis/AppApi';
 
-const featuresApi=new FeatureApi();
+const appApi=new AppApi();
 
 export default function NavLeft(){
 
-  const dirList= featuresApi.getSectionsList()
+  const dirList= appApi.getSectionsList()
 
     return (
       

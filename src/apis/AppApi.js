@@ -1,6 +1,6 @@
 const nodejs=window.nodejs;
 
-export default class FeatureApi {
+export default class AppApi {
 
   
     getSectionsList(){

@@ -2,16 +2,16 @@ import React from 'react';
 import { Button, Card } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
 
-import FeatureApi from '../apis/FeatureApi';
+import AppApi from '../apis/AppApi';
 
-const featuresApi=new FeatureApi();
+const appApi=new AppApi();
 
 export default function FeaturesList() {
 
     let { section } = useParams();
 
 
-    const featuresList=featuresApi.getFeaturesListInSection( section );
+    const featuresList=appApi.getFeaturesListInSection( section );
 
   return (
     <>
