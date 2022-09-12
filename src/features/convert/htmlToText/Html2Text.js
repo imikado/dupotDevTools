@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Button, Col, Form, Row } from "react-bootstrap";
 
-import FileSystemApi from "../../../apis/FileSystemApi";
+import SystemApi from "../../../apis/SystemApi";
 import DatetimeApi from "../../../apis/DatetimeApi";
 
 import Settings from "./Settings";
@@ -9,8 +9,8 @@ import card from "./card.json";
 
 const datetimeApi=new DatetimeApi();
 
-const filesystemApi=new FileSystemApi();
-filesystemApi.loadCard(card);
+const systemApi=new SystemApi();
+systemApi.loadCard(card);
 
 export default function Html2Text() {
   const [input, setInput] = useState("");
@@ -22,8 +22,8 @@ export default function Html2Text() {
 
 
   //command
-  const inputFile = filesystemApi.getTempFilePath("input");
-  const outputFile = filesystemApi.getTempFilePath("output");
+  const inputFile = systemApi.getTempFilePath("input");
+  const outputFile = systemApi.getTempFilePath("output");
   const command= settingsObj.binaryPath+ " -o " + outputFile+" " + inputFile 
 
   //settings
@@ -35,20 +35,20 @@ export default function Html2Text() {
 
 
   const saveSettings=(settingsObj)=>{
-    filesystemApi.saveJsonSettings(settingsObj);
+    systemApi.saveJsonSettings(settingsObj);
   }
 
   useEffect(() => {
-    setSettingsObj(filesystemApi.readJsonSettings());
+    setSettingsObj(systemApi.readJsonSettings());
     
   },[]);
 
   const convert = () => {
-    filesystemApi.writeTempFile(inputFile, input);
+    systemApi.writeTempFile(inputFile, input);
 
-    let outputError=filesystemApi.launchCommand(command);
+    let outputError=systemApi.launchCommand(command);
 
-    var outputConverted = filesystemApi.readTempFile(outputFile);
+    var outputConverted = systemApi.readTempFile(outputFile);
 
     if(outputError){
       setOutput(outputError);

@@ -1,6 +1,6 @@
 const nodejs=window.nodejs;
 
-export default class FileSystemApi{
+export default class SystemApi{
 
     
     loadCard(card){

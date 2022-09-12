@@ -4,11 +4,11 @@ import { Button, Card, Col, Form, Row } from "react-bootstrap";
 import Settings from "./Settings";
 import card from "./card.json";
 
-import FileSystemApi from "../../../apis/FileSystemApi";
+import SystemApi from "../../../apis/SystemApi";
 import DatetimeApi from "../../../apis/DatetimeApi";
 
-const filesytemApi=new FileSystemApi();
-filesytemApi.loadCard(card);
+const sytemApi=new SystemApi();
+sytemApi.loadCard(card);
 
 const datetimeApi=new DatetimeApi();
 
@@ -40,17 +40,17 @@ export default function GetTldr() {
 
 
   const saveSettings=(settingsObj)=>{
-    filesytemApi.saveJsonSettings(settingsObj);
+    sytemApi.saveJsonSettings(settingsObj);
   }
 
   useEffect(() => {
-    setSettingsObj(filesytemApi.readJsonSettings());
+    setSettingsObj(sytemApi.readJsonSettings());
     
   },[]);
 
   const convert = () => {
 
-    let outputError=filesytemApi.launchCommand(command+ " "+input);
+    let outputError=sytemApi.launchCommand(command+ " "+input);
 
 
     var convert = new Convert({
