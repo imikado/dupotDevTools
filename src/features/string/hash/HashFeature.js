@@ -8,7 +8,7 @@ const textApi=new TextApi();
 const datetimeApi=new DatetimeApi();
 
 
-export default function Hash() {
+export default function HashFeature() {
   const [input, setInput] = useState("");
   const [outputMd5, setOutputMd5] = useState("");
   const [outputSha1, setOutputSha1] = useState("");

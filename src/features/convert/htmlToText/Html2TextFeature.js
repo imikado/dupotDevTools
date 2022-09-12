@@ -12,7 +12,7 @@ const datetimeApi=new DatetimeApi();
 const systemApi=new SystemApi();
 systemApi.loadCard(card);
 
-export default function Html2Text() {
+export default function Html2TextFeature() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
 

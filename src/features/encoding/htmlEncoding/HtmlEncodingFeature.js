@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
-import DatetimeApi from '../../../apis/DatetimeApi';
+
+import DatetimeApi from "../../../apis/DatetimeApi";
+import TextApi from "../../../apis/TextApi";
 
 const datetimeApi=new DatetimeApi();
+const textApi=new TextApi();
 
-export default function UrlEncoding() {
+
+export default function HtmlEncodingFeature() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   
@@ -12,13 +16,13 @@ export default function UrlEncoding() {
 
   const encode = () => {
    
-    setOutput(encodeURI(input))
+    setOutput(textApi.htmlEncode(input))
 
     setStatus('Encoding at '+datetimeApi.getTimeToString());
   };
   const decode = () => {
    
-    setOutput(decodeURI(input))
+    setOutput(textApi.htmlDecode(input))
 
     setStatus('Decoding at '+datetimeApi.getTimeToString());
   };
@@ -42,7 +46,7 @@ export default function UrlEncoding() {
             }}
             placeholder="Enter text to hash"
           />
-          <Form.Text className="text-muted">String you want to encode/decode from/to URL</Form.Text>
+          <Form.Text className="text-muted">String you want to encode/decode from/to HTML</Form.Text>
         </Form.Group>
 
         <Form.Group className="mb-3">

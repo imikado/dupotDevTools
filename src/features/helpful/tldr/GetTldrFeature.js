@@ -15,7 +15,7 @@ const datetimeApi=new DatetimeApi();
 const Convert = require('ansi-to-html');
 
 
-export default function GetTldr() {
+export default function GetTldrFeature() {
 
   const section='helpful';
   const feature='tldr';

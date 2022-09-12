@@ -4,10 +4,10 @@ import { Button, Form } from "react-bootstrap";
 import DatetimeApi from "../../../apis/DatetimeApi";
 import TextApi from "../../../apis/TextApi";
 
-const datetimeApi=new DatetimeApi();
 const textApi=new TextApi();
+const datetimeApi=new DatetimeApi();
 
-export default function XmlFormat() {
+export default function JsonFormatFeature() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
 
@@ -15,7 +15,7 @@ export default function XmlFormat() {
 
   const convert = () => {
 
-    var outputConverted=textApi.xmlFormat(input);
+    var outputConverted=textApi.jsonIndent(input);
 
     setOutput('');
     try{
@@ -23,7 +23,7 @@ export default function XmlFormat() {
     }catch(e){
       console.log('Error'+e.message);
     }
-    setStatus('Formated at '+datetimeApi.getTimeToString());
+    setStatus('Converted at '+datetimeApi.getTimeToString());
   };
 
   return (
@@ -38,7 +38,7 @@ export default function XmlFormat() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Enter text to convert"
           />
-          <Form.Text className="text-muted">XML to format</Form.Text>
+          <Form.Text className="text-muted">HTML to convert to text</Form.Text>
         </Form.Group>
 
         <Form.Group className="mb-3">
