@@ -20,6 +20,10 @@ export default class AppApi {
         return featureList; 
     }
 
+    getIcon(section,feature){
+        return nodejs.getIcon(section,feature);
+    }
+
    
     
     

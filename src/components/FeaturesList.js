@@ -18,17 +18,16 @@ export default function FeaturesList() {
         {featuresList.map( 
             (featureObj) =>  
 
-            <Card key={featureObj.name} style={{ width: '300px', float:'left', margin:'5px',  }}>
-              <Card.Header>{featureObj.name}</Card.Header>
-              <Card.Body  >
+            <Card key={featureObj.name} style={{ width: '252px', float:'left', margin:'5px',  }}>
+              <Card.Img variant="top" src={ appApi.getIcon(featureObj.section.path, featureObj.name)} />
+              <Card.Footer  >
                 <Card.Text>{featureObj.description}</Card.Text> 
 
-
-                
-
-                <Button variant="primary" href={"/section/"+section+"/"+featureObj.name} to={"#section_"+section+'_'+featureObj.name}>Go</Button>
-              </Card.Body>
-              <Card.Footer show={featureObj.comment}>{featureObj.comment}</Card.Footer> 
+                <div className="d-grid gap-2">
+                <Button size="sm" variant="secondary" href={"/section/"+section+"/"+featureObj.name} to={"#section_"+section+'_'+featureObj.name}>Go</Button>
+                </div>
+              
+              </Card.Footer>
                 
             </Card>
       )}

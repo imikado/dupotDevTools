@@ -1,7 +1,7 @@
 export default function Home(){
 
     return (
-        <div>home</div>
+        <div>S&eacute;lectionnez une section sur la gauche pour voir les outils disponibles.</div>
     )
 
 }

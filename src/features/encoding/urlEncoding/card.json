@@ -1,5 +1,5 @@
 {
-    "description": "encode/decode text from/to HTML",
+    "description": "encode/decode text from/to URL",
     "section": {
         "path": "encoding"
     },

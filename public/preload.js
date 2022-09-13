@@ -14,6 +14,11 @@ const tempDirectory='/tmp';
 
 contextBridge.exposeInMainWorld('nodejs', {
 
+  getIcon: (section,feature) =>{
+
+     return 'file:///'+__dirname+'/'+join('..','src','features',section,feature,'icon.png')
+  },
+
   join: (pathList) => {
 
     pathList.unshift(__dirname);

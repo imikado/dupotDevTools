@@ -2,7 +2,6 @@ const nodejs=window.nodejs;
 
 export default class SystemApi{
 
-    
     loadCard(card){
         if(!card.path){
             throw new Error('Missing field path in your card');
