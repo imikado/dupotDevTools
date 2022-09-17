@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Button, Form } from "react-bootstrap";
 import DatetimeApi from "../../../apis/DatetimeApi";
-import TextApi from "../../../apis/TextApi";
+import YAML from 'yaml'
 
 const datetimeApi=new DatetimeApi();
-const textApi=new TextApi();
 
 export default function YamlToJsonFeature() {
   const [input, setInput] = useState("");
@@ -13,12 +12,14 @@ export default function YamlToJsonFeature() {
   const [status, setStatus] = useState();
 
   const convertToYaml = () => {
-    setOutput(textApi.convertJsonToYaml(input));
+    let yamlConverted=YAML.stringify(JSON.parse(input)) 
+    setOutput(yamlConverted);
 
     setStatus('Converted at '+datetimeApi.getTimeToString());
   };
   const convertToJson = () => {
-    setOutput(textApi.convertYamlToJson(input));
+    let jsonConverted=JSON.stringify( YAML.parse(input))
+    setOutput(jsonConverted);
 
     setStatus('Converted at '+datetimeApi.getTimeToString());
   };
@@ -44,9 +45,9 @@ export default function YamlToJsonFeature() {
           <Form.Text className="text-muted">{status}</Form.Text>
         </Form.Group>
 
-        <Button onClick={() => convertToYaml()}>Convert to YAML</Button>
+        <Button onClick={convertToYaml}>Convert to YAML</Button>
         &nbsp;
-        <Button onClick={() => convertToJson()}>Convert to JSON</Button>
+        <Button onClick={convertToJson}>Convert to JSON</Button>
 
       </Form>
     </div>

@@ -2,10 +2,9 @@ import React, { useState } from "react";
 import { Button, Form } from "react-bootstrap";
 
 import DatetimeApi from "../../../apis/DatetimeApi";
-import TextApi from "../../../apis/TextApi";
+import { format } from 'sql-formatter';
 
 const datetimeApi=new DatetimeApi();
-const textApi=new TextApi();
 
 export default function SqlFormatFeature() {
   const [input, setInput] = useState("");
@@ -15,8 +14,13 @@ export default function SqlFormatFeature() {
 
   const convert = () => {
 
-    var outputConverted=textApi.sqlFormat(input);
-
+    var outputConverted=format(input,{
+      language: 'spark',
+      tabWidth: 2,
+      keywordCase: 'upper',
+      linesBetweenQueries: 2,
+    })
+    
     setOutput('');
     try{
       setOutput(outputConverted);

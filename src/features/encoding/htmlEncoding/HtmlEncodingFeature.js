@@ -2,11 +2,9 @@ import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
 
 import DatetimeApi from "../../../apis/DatetimeApi";
-import TextApi from "../../../apis/TextApi";
+import HTMLDecoderEncoder from "html-encoder-decoder";
 
 const datetimeApi=new DatetimeApi();
-const textApi=new TextApi();
-
 
 export default function HtmlEncodingFeature() {
   const [input, setInput] = useState("");
@@ -16,13 +14,13 @@ export default function HtmlEncodingFeature() {
 
   const encode = () => {
    
-    setOutput(textApi.htmlEncode(input))
+    setOutput(HTMLDecoderEncoder.encode(input))
 
     setStatus('Encoding at '+datetimeApi.getTimeToString());
   };
   const decode = () => {
    
-    setOutput(textApi.htmlDecode(input))
+    setOutput(HTMLDecoderEncoder.decode(input))
 
     setStatus('Decoding at '+datetimeApi.getTimeToString());
   };

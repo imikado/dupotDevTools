@@ -2,10 +2,10 @@ import React, { useState } from "react";
 import { Button, Form } from "react-bootstrap";
 
 import DatetimeApi from "../../../apis/DatetimeApi";
-import TextApi from "../../../apis/TextApi";
+
+import format from 'xml-formatter';
 
 const datetimeApi=new DatetimeApi();
-const textApi=new TextApi();
 
 export default function XmlFormatFeature() {
   const [input, setInput] = useState("");
@@ -15,7 +15,7 @@ export default function XmlFormatFeature() {
 
   const convert = () => {
 
-    var outputConverted=textApi.xmlFormat(input);
+    var outputConverted=format(input);
 
     setOutput('');
     try{

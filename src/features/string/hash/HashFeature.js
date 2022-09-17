@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
 
-import TextApi from '../../../apis/TextApi';
 import DatetimeApi from '../../../apis/DatetimeApi';
+import crypto from 'crypto-js';
 
-const textApi=new TextApi();
 const datetimeApi=new DatetimeApi();
 
 
@@ -15,12 +14,13 @@ export default function HashFeature() {
   const [outputSha256, setOutputSha256] = useState("");
 
   const [status, setStatus] = useState();
+ 
 
   const convert = () => {
    
-    setOutputMd5(textApi.hash(input,'md5'))
-    setOutputSha1(textApi.hash(input,'sha1'))
-    setOutputSha256(textApi.hash(input,'sha256'))
+    setOutputMd5(crypto.MD5(input))
+    setOutputSha1(crypto.SHA1(input))
+    setOutputSha256(crypto.SHA256(input))
 
     setStatus('Converted at '+datetimeApi.getTimeToString());
   };
@@ -61,6 +61,10 @@ export default function HashFeature() {
           <Form.Label>Sha256</Form.Label>
           <Form.Control  value={outputSha256} readOnly></Form.Control>
         </Form.Group>
+
+        <Form.Group className="mb-3">
+        <Form.Text className="text-muted">{status}</Form.Text>
+            </Form.Group>
 
         <Button onClick={() => convert()}>Convert</Button>
       </Form>

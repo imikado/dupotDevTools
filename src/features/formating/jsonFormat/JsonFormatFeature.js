@@ -2,9 +2,7 @@ import React, { useState } from "react";
 import { Button, Form } from "react-bootstrap";
 
 import DatetimeApi from "../../../apis/DatetimeApi";
-import TextApi from "../../../apis/TextApi";
 
-const textApi=new TextApi();
 const datetimeApi=new DatetimeApi();
 
 export default function JsonFormatFeature() {
@@ -15,8 +13,8 @@ export default function JsonFormatFeature() {
 
   const convert = () => {
 
-    var outputConverted=textApi.jsonIndent(input);
-
+    var outputConverted=JSON.stringify( JSON.parse(input), null,4)
+    
     setOutput('');
     try{
       setOutput(outputConverted);
