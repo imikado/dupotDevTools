@@ -1,5 +1,5 @@
+import { Box, Button, Card, CardActionArea, CardContent, CardMedia, Grid, Typography } from '@mui/material';
 import React from 'react';
-import { Button, Card } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
 
 import AppApi from '../apis/AppApi';
@@ -14,23 +14,37 @@ export default function FeaturesList() {
     const featuresList=appApi.getFeaturesListInSection( section );
 
   return (
-    <>
+    <Grid container columnSpacing={{ xs: 1, sm: 2, md: 3 }} rowSpacing={3}>
         {featuresList.map( 
             (featureObj) =>  
 
-            <Card key={featureObj.name} style={{ width: '252px', float:'left', margin:'5px',  }}>
-              <Card.Img variant="top" src={ appApi.getIcon(featureObj.section.path, featureObj.name)} />
-              <Card.Footer  >
-                <Card.Text>{featureObj.description}</Card.Text> 
+            <Grid key={featureObj.name}  item xs={4}>
+            <Card >
+              <CardActionArea
+              href={"/section/"+section+"/"+featureObj.name} to={"#section_"+section+'_'+featureObj.name}
+              >
+                <CardMedia
+                  component="img"
+                  height="250"
+                  image={ appApi.getIcon(featureObj.section.path, featureObj.name)}
+                  alt="green iguana"
 
-                <div className="d-grid gap-2">
-                <Button size="sm" variant="secondary" href={"/section/"+section+"/"+featureObj.name} to={"#section_"+section+'_'+featureObj.name}>Go</Button>
-                </div>
-              
-              </Card.Footer>
-                
+
+                />
+                <CardContent>
+                  <Typography gutterBottom variant="h5" component="div">
+                    {featureObj.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                  {featureObj.description}
+                  </Typography>
+                </CardContent>
+              </CardActionArea>
             </Card>
+            </Grid>
+
+
       )}
-    </>
+    </Grid>
   );
 }

@@ -13,7 +13,7 @@ export default class SystemApi{
     }
 
     getTempFilePath(filename_){
-        return nodejs.getTempFilePath( this.card.name+'.'+filename_);
+        return nodejs.getTempFilePath( this.card.path+'.'+filename_);
     }
 
     readTempFile(filename_){

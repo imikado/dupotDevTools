@@ -1,5 +1,5 @@
-import { ListGroup } from "react-bootstrap";
-import { Link } from "react-router-dom";
+import { ButtonGroup,Button, Box } from "@mui/material";
+import { Link as RouterLink} from "react-router-dom";
 
 import AppApi from '../apis/AppApi';
 
@@ -10,15 +10,23 @@ export default function NavLeft(){
   const dirList= appApi.getSectionsList()
 
     return (
-      
-      <ListGroup  variant="flush">
-        
-        {dirList.map( (name)=><ListGroup.Item as={Link} key={name} to={"section/"+name} href={"#"+name} >{name}</ListGroup.Item>)}
+    
 
-      </ListGroup>
+      <ButtonGroup
+      orientation="vertical"
+      aria-label="vertical outlined button group"
+      variant="contained"
+    >
+             {dirList.map( 
+                (name)=>
+                  <Button key={name} component={RouterLink} to={"section/"+name} href={"#"+name} >{name}</Button>
+              )}
+
+    </ButtonGroup>
+    
     )
 
-}
+};
 
 
 
