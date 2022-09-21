@@ -79,8 +79,7 @@ export default function GetTldrFeature() {
         <FormControl fullWidth>
           <TextField
             label="Input"
-            multiline
-            rows={4}
+            
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Enter text to convert"
