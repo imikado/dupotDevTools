@@ -5,7 +5,13 @@ import DatetimeApi from "../../../apis/DatetimeApi";
 
 import Settings from "./Settings";
 import card from "./card.json";
-import { Box, Button, ButtonGroup, FormControl, Grid, TextField } from "@mui/material";
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  FormControl,
+  TextField,
+} from "@mui/material";
 
 const datetimeApi = new DatetimeApi();
 
@@ -65,13 +71,12 @@ export default function Html2TextFeature() {
       />
 
       <Box component="form" noValidate autoComplete="off">
-        <div style={{"textAlign":"right"}}>
-        <Button variant="default" onClick={handleShow}>
+        <div style={{ textAlign: "right" }}>
+          <Button variant="default" onClick={handleShow}>
             Settings
           </Button>
-          
         </div>
-        <FormControl fullWidth >
+        <FormControl fullWidth>
           <TextField
             label="Input"
             multiline
@@ -87,7 +92,9 @@ export default function Html2TextFeature() {
             multiline
             rows={9}
             value={output}
-            readOnly
+            InputProps={{
+              readOnly: true,
+            }}
             helperText={command}
           />
 
@@ -95,10 +102,11 @@ export default function Html2TextFeature() {
 
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-          <Button variant="contained" onClick={() => convert()}>
-            Convert
-          </Button>
-          </ButtonGroup></div>
+              <Button variant="contained" onClick={() => convert()}>
+                Convert
+              </Button>
+            </ButtonGroup>
+          </div>
         </FormControl>
       </Box>
     </>

@@ -10,7 +10,9 @@ export default function App() {
     <Grid container >
 
       <Grid item  xs ><NavLeft /></Grid>
-      <Grid item xs={10}  >
+      <Grid item xs={10}  sx={{
+          "& .MuiTextField-root": { m: 1 },
+        }}>
           <Routing/>
         </Grid>
       </Grid>

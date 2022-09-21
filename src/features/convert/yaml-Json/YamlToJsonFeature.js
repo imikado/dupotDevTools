@@ -35,7 +35,6 @@ export default function YamlToJsonFeature() {
             rows={4}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Enter text to convert"
             helperText="YAML/JSON to convert to JSON/YAML"
           />
 
@@ -44,7 +43,9 @@ export default function YamlToJsonFeature() {
             multiline
             rows={9}
             value={output}
-            readOnly
+            InputProps={{
+              readOnly: true,
+            }}
           />
 
           <p>{status}</p>

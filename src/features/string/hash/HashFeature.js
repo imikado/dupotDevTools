@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
-import { Button, Form } from 'react-bootstrap';
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  FormControl,
+  TextField,
+} from "@mui/material";
+import React, { useState } from "react";
 
-import DatetimeApi from '../../../apis/DatetimeApi';
-import crypto from 'crypto-js';
+import DatetimeApi from "../../../apis/DatetimeApi";
+import crypto from "crypto-js";
 
-const datetimeApi=new DatetimeApi();
-
+const datetimeApi = new DatetimeApi();
 
 export default function HashFeature() {
   const [input, setInput] = useState("");
@@ -14,60 +19,67 @@ export default function HashFeature() {
   const [outputSha256, setOutputSha256] = useState("");
 
   const [status, setStatus] = useState();
- 
 
   const convert = () => {
-   
-    setOutputMd5(crypto.MD5(input))
-    setOutputSha1(crypto.SHA1(input))
-    setOutputSha256(crypto.SHA256(input))
+    setOutputMd5(crypto.MD5(input));
+    setOutputSha1(crypto.SHA1(input));
+    setOutputSha256(crypto.SHA256(input));
 
-    setStatus('Converted at '+datetimeApi.getTimeToString());
+    setStatus("Converted at " + datetimeApi.getTimeToString());
   };
 
-  const resetOutput= () => {
-    setOutputMd5('')
-    setOutputSha1('')
-    console.log('reset')
-  }
+  const resetOutput = () => {
+    setOutputMd5("");
+    setOutputSha1("");
+    console.log("reset");
+  };
 
   return (
-    <div>
-      <Form>
-        <Form.Group className="mb-3">
-          <Form.Label>Input</Form.Label>
-          <Form.Control
-             value={input}
-            onChange={(e) => {
-              setInput(e.target.value)
-              resetOutput()
-            }}
-            placeholder="Enter text to hash"
+    <>
+      <Box component="form" noValidate autoComplete="off">
+        <FormControl fullWidth>
+          <TextField
+            label="Input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            helperText="Text to hash"
           />
-          <Form.Text className="text-muted">String you want to hash</Form.Text>
-        </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Md5</Form.Label>
-          <Form.Control  value={outputMd5} readOnly></Form.Control>
-        </Form.Group>
+          <TextField
+            label="Md5"
+            value={outputMd5}
+            InputProps={{
+              readOnly: true,
+            }}
+          />
 
-        <Form.Group className="mb-3">
-          <Form.Label>Sha1</Form.Label>
-          <Form.Control  value={outputSha1} readOnly></Form.Control>
-        </Form.Group>
+          <TextField
+            label="Sha1"
+            value={outputSha1}
+            InputProps={{
+              readOnly: true,
+            }}
+          />
 
-        <Form.Group className="mb-3">
-          <Form.Label>Sha256</Form.Label>
-          <Form.Control  value={outputSha256} readOnly></Form.Control>
-        </Form.Group>
+          <TextField
+            label="Sha256"
+            value={outputSha256}
+            InputProps={{
+              readOnly: true,
+            }}
+          />
 
-        <Form.Group className="mb-3">
-        <Form.Text className="text-muted">{status}</Form.Text>
-            </Form.Group>
+          <p>{status}</p>
 
-        <Button onClick={() => convert()}>Convert</Button>
-      </Form>
-    </div>
+          <div style={{ textAlign: "center" }}>
+            <ButtonGroup>
+              <Button variant="contained" onClick={convert}>
+                Hash
+              </Button>
+            </ButtonGroup>
+          </div>
+        </FormControl>
+      </Box>
+    </>
   );
 }

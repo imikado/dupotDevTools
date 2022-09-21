@@ -1,11 +1,17 @@
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  FormControl,
+  TextField,
+} from "@mui/material";
 import React, { useState } from "react";
-import { Button, Form } from "react-bootstrap";
 
 import DatetimeApi from "../../../apis/DatetimeApi";
 
-import format from 'xml-formatter';
+import format from "xml-formatter";
 
-const datetimeApi=new DatetimeApi();
+const datetimeApi = new DatetimeApi();
 
 export default function XmlFormatFeature() {
   const [input, setInput] = useState("");
@@ -14,41 +20,49 @@ export default function XmlFormatFeature() {
   const [status, setStatus] = useState();
 
   const convert = () => {
+    var outputConverted = format(input);
 
-    var outputConverted=format(input);
-
-    setOutput('');
-    try{
+    setOutput("");
+    try {
       setOutput(outputConverted);
-    }catch(e){
-      console.log('Error'+e.message);
+    } catch (e) {
+      console.log("Error" + e.message);
     }
-    setStatus('Formated at '+datetimeApi.getTimeToString());
+    setStatus("Formated at " + datetimeApi.getTimeToString());
   };
 
   return (
-    <div>
-      <Form>
-        <Form.Group className="mb-3">
-          <Form.Label>Input</Form.Label>
-          <Form.Control
-            as="textarea"
-            rows={3}
+    <>
+      <Box component="form" noValidate autoComplete="off">
+        <FormControl fullWidth>
+          <TextField
+            label="Input"
+            multiline
+            rows={4}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Enter text to convert"
+            helperText="XML to format"
           />
-          <Form.Text className="text-muted">XML to format</Form.Text>
-        </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Output</Form.Label>
-          <Form.Control as="textarea" rows={10} value={output} readOnly></Form.Control>
-          <Form.Text className="text-muted">{status}</Form.Text>
-        </Form.Group>
+          <TextField
+            label="Output"
+            multiline
+            rows={9}
+            value={output}
+            readOnly
+          />
 
-        <Button onClick={() => convert()}>Convert</Button>
-      </Form>
-    </div>
+          <p>{status}</p>
+
+          <div style={{ textAlign: "center" }}>
+            <ButtonGroup>
+              <Button variant="contained" onClick={convert}>
+                Format
+              </Button>
+            </ButtonGroup>
+          </div>
+        </FormControl>
+      </Box>
+    </>
   );
 }
