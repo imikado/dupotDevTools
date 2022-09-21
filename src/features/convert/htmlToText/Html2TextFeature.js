@@ -5,7 +5,7 @@ import DatetimeApi from "../../../apis/DatetimeApi";
 
 import Settings from "./Settings";
 import card from "./card.json";
-import { Box, Button, FormControl, Grid, TextField } from "@mui/material";
+import { Box, Button, ButtonGroup, FormControl, Grid, TextField } from "@mui/material";
 
 const datetimeApi = new DatetimeApi();
 
@@ -92,9 +92,13 @@ export default function Html2TextFeature() {
           />
 
           <p>{status}</p>
+
+          <div style={{ textAlign: "center" }}>
+            <ButtonGroup>
           <Button variant="contained" onClick={() => convert()}>
             Convert
           </Button>
+          </ButtonGroup></div>
         </FormControl>
       </Box>
     </>

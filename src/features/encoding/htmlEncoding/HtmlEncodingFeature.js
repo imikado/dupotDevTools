@@ -1,67 +1,73 @@
-import React, { useState } from 'react';
-import { Button, Form } from 'react-bootstrap';
+import React, { useState } from "react";
 
 import DatetimeApi from "../../../apis/DatetimeApi";
 import HTMLDecoderEncoder from "html-encoder-decoder";
+import { Box } from "@mui/system";
+import { Button, ButtonGroup, FormControl, TextField } from "@mui/material";
 
-const datetimeApi=new DatetimeApi();
+const datetimeApi = new DatetimeApi();
 
 export default function HtmlEncodingFeature() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
-  
+
   const [status, setStatus] = useState();
 
   const encode = () => {
-   
-    setOutput(HTMLDecoderEncoder.encode(input))
+    setOutput(HTMLDecoderEncoder.encode(input));
 
-    setStatus('Encoding at '+datetimeApi.getTimeToString());
+    setStatus("Encoding at " + datetimeApi.getTimeToString());
   };
   const decode = () => {
-   
-    setOutput(HTMLDecoderEncoder.decode(input))
+    setOutput(HTMLDecoderEncoder.decode(input));
 
-    setStatus('Decoding at '+datetimeApi.getTimeToString());
+    setStatus("Decoding at " + datetimeApi.getTimeToString());
   };
 
-  const resetOutput= () => {
-    setOutput('')
-  }
+  const resetOutput = () => {
+    setOutput("");
+  };
 
   return (
-    <div>
-      <Form>
-        <Form.Group className="mb-3">
-          <Form.Label>Input</Form.Label>
-          <Form.Control
-            as="textarea"
-            rows={3}
-             value={input}
+    <>
+      <Box component="form" noValidate autoComplete="off">
+        <FormControl fullWidth>
+          <TextField
+            label="Input"
+            multiline
+            rows={4}
+            value={input}
             onChange={(e) => {
-              setInput(e.target.value)
-              resetOutput()
+              setInput(e.target.value);
+              resetOutput();
             }}
-            placeholder="Enter text to hash"
+            placeholder="Enter text to encode"
+            helperText="String you want to encode/decode from/to HTML"
           />
-          <Form.Text className="text-muted">String you want to encode/decode from/to HTML</Form.Text>
-        </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Output</Form.Label>
-          <Form.Control as="textarea"
-            rows={9} value={output} readOnly></Form.Control>
-            <Form.Text className="text-muted">{status}</Form.Text>
+          <TextField
+            label="Output"
+            multiline
+            rows={9}
+            value={output}
+            readOnly
+          />
 
-        </Form.Group>
+          <p>{status}</p>
 
-      
+          <div style={{ textAlign: "center" }}>
+            <ButtonGroup>
+              <Button variant="contained" onClick={encode}>
+                Encode
+              </Button>
 
-        <Button onClick={() => encode()}>Encode</Button>
-        &nbsp;
-
-        <Button onClick={() => decode()}>Decode</Button>
-      </Form>
-    </div>
+              <Button variant="contained" onClick={decode}>
+                Decode
+              </Button>
+            </ButtonGroup>
+          </div>
+        </FormControl>
+      </Box>
+    </>
   );
 }
