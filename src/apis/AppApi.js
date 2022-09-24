@@ -1,84 +1,92 @@
-const nodejs=window.nodejs;
+const nodejs = window.nodejs;
 
 export default class AppApi {
+  loadCard(card) {
+    if (!card.path) {
+      throw new Error("Missing field path in your card");
+    }
+    if (!card.section || !card.section.path) {
+      throw new Error("Missing field section.path in your card");
+    }
+    this.card = card;
+  }
 
+  getSectionsList() {
+    let featurePathList = nodejs.getFeaturePathList();
+    return nodejs.getDirectoryListWithPathList(featurePathList);
+  }
 
-    loadCard(card){
-        if(!card.path){
-            throw new Error('Missing field path in your card');
-        }
-        if(!card.section || !card.section.path){
-            throw new Error('Missing field section.path in your card');
-        }
-        this.card=card;
+  getFeaturesListInSection(section) {
+    let featureList = [];
+    let sectionPathList = nodejs.getFeaturePathList();
+    sectionPathList.push(section);
+    let dirList = nodejs.getDirectoryListWithPathList(sectionPathList);
+    for (let dirKeyLoop in dirList) {
+      let dirLoop = dirList[dirKeyLoop];
+
+      let jsonPathList = sectionPathList.concat([dirLoop, "card.json"]);
+      let featureLoop = nodejs.getJsonWithPathList(jsonPathList);
+      featureLoop.name = dirLoop;
+
+      featureList.push(featureLoop);
+    }
+    return featureList;
+  }
+
+  getCurrentFeaturePathList() {
+    return nodejs
+      .getFeaturePathList()
+      .concat([this.getSectionPath(), this.getPath()]);
+  }
+
+  getTempFilePath(filename_) {
+    let tempFilePathList = nodejs
+      .getTempPathList()
+      .concat([this.card.path + "." + filename_]);
+    return nodejs.getJoinPathList(tempFilePathList);
+  }
+
+  getIcon(section, feature) {
+    let iconPathList=nodejs.getFeaturePathList().concat([section,feature,"icon.png"]);
+    return nodejs.getFilePathWithPathList(iconPathList);
+  }
+
+  getSectionPath() {
+    if (!this.card) {
+      throw new Error("Missing card, need loadCard()");
     }
 
-  
-    getSectionsList(){
-        return nodejs.getDirectoryList(nodejs.join(['..','src','features']));
+    if (!this.card.section.path) {
+      throw new Error("Missing field section.path in your card");
+    }
+    return this.card.section.path;
+  }
+  getPath() {
+    if (!this.card) {
+      throw new Error("Missing card, need loadCard()");
+    }
+    if (!this.card.path) {
+      throw new Error("Missing field path in your card");
     }
 
-    getFeaturesListInSection(section){
-        let featureList=[];
-        let dirList= nodejs.getDirectoryList(nodejs.join(['..','src','features',section]));
-        for(let dirKeyLoop in dirList){
-            let dirLoop=dirList[dirKeyLoop];
-            let featureLoop=nodejs.getJsonFromFeatureFile(section,dirLoop,'card.json');
-            featureLoop.name=dirLoop;
+    return this.card.path;
+  }
 
-            featureList.push(featureLoop);
-        }
-        return featureList; 
-    }
+  readFeatureFileWithPathList(pathList) {
+    return nodejs.readFeatureFileWithPathList(
+      this.getCurrentFeaturePathList().concat(pathList)
+    );
+  }
 
-    getIcon(section,feature){
-        return nodejs.getIcon(section,feature);
-    }
-
-   
-    readFeatureFileWithPathList(pathList){
-        let rootPathList= ['..', 'src','features',this.getSectionPath(),this.getPath()];
-
-        return nodejs.readFeatureFileWithPathList(  rootPathList.concat(pathList));
-    }
-
-
-    getSectionPath(){
-        if(!this.card){
-            throw new Error('Missing card, need loadCard()');
-
-        }
-        
-        if(!this.card.section.path){
-            throw new Error('Missing field section.path in your card');
-        }
-        return this.card.section.path
-    }
-    getPath(){
-        if(!this.card){
-            throw new Error('Missing card, need loadCard()');
-
-        }
-        if(!this.card.path){
-            throw new Error('Missing field path in your card');
-        }
-        
-        return this.card.path
-    }
-
-
-    getTempFilePath(filename_){
-        return nodejs.getTempFilePath( this.card.path+'.'+filename_);
-    }
-
-    readJsonSettings(){
-        return nodejs.getJsonFromFeatureFile(this.getSectionPath(),this.getPath(),'settings.json');
-    }
-    saveJsonSettings(settingsObj_){
-        
-        return nodejs.saveFeatureJsonFile(this.getSectionPath(),this.getPath(),'settings.json', settingsObj_);
-    }
-    
-
-};
-
+  readJsonSettings() {
+    return nodejs.getJsonWithPathList(
+      this.getCurrentFeaturePathList().concat(["settings.json"])
+    );
+  }
+  saveJsonSettings(settingsObj_) {
+    return nodejs.saveJsonWithPathList(
+      this.getCurrentFeaturePathList().concat(["settings.json"]),
+      settingsObj_
+    );
+  }
+}

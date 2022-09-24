@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from "react";
 
-import AppApi from "../../../apis/AppApi";
-import DatetimeApi from "../../../apis/DatetimeApi";
-
 import Settings from "./Settings";
 import card from "./card.json";
 import {
@@ -12,12 +9,13 @@ import {
   FormControl,
   TextField,
 } from "@mui/material";
+
+import AppApi from "../../../apis/AppApi";
+import DatetimeApi from "../../../apis/DatetimeApi";
 import SystemApi from "../../../apis/SystemApi";
 
 const datetimeApi = new DatetimeApi();
-
-const systemApi= new SystemApi();
-
+const systemApi = new SystemApi();
 const appApi = new AppApi();
 appApi.loadCard(card);
 

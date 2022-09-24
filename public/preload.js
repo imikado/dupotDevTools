@@ -1,92 +1,83 @@
-const { contextBridge  } = require('electron')
+const { contextBridge } = require("electron");
 
-const { readdirSync, statSync , writeFileSync,readFileSync,unlinkSync } = require('fs')
-const {  join } = require('path')
+const {
+  readdirSync,
+  statSync,
+  writeFileSync,
+  readFileSync,
+  unlinkSync,
+} = require("fs");
+const { join } = require("path");
 const { execSync } = require("child_process");
 
-var crypto = require('crypto')
+var crypto = require("crypto");
+
+const joinPathList = (pathList_) => pathList_.join("/");
+const getDirectoryListWithPath = (p) =>
+  readdirSync(p).filter((f) => statSync(join(p, f)).isDirectory());
+const readFileWithPath = (path_) => readFileSync(path_, "utf8");
+const writeFileWithPath = (path_, content_) => {
+  writeFileSync(path_, content_, (err) => {
+    if (err) {
+      console.error(err);
+    }
+  });
+};
+
+const tempDirectory = "/tmp";
+
+contextBridge.exposeInMainWorld("nodejs", {
 
 
-const dirs = p => readdirSync(p).filter(f => statSync(join(p, f)).isDirectory())
+  getFilePathWithPathList: (pathList) =>{
 
-const tempDirectory='/tmp';
-
-contextBridge.exposeInMainWorld('nodejs', {
-
-  getIcon: (section,feature) =>{
-
-     return 'file:///'+__dirname+'/'+join('..','src','features',section,feature,'icon.png')
+    return "file:///" + joinPathList(pathList);
+  },
+ 
+  getJoinPathList: (pathList) => {
+    return joinPathList(pathList);
   },
 
-  join: (pathList) => {
-
-    pathList.unshift(__dirname);
-
-    return pathList.join('/');
-  }, 
-
-  getDirectoryList: (path_) => dirs(path_),
-
-  writeFilePath:(filename_,content_) => {
-    writeFileSync(  filename_, content_, err => {
-      if (err) {
-        console.error(err);
-      }
-      // file written successfully
-    });
-  },
-  readFeatureFileWithPathList:(pathList_) => {
-    return readFileSync( join(__dirname, pathList_),'utf8');
-  },
-  readFileWithPathList:(pathList_) => {
-    return readFileSync( join( pathList_ ),'utf8');
-  },
-  removeFileWithPathList:(filename_)=>{
-    return unlinkSync(filename_);
+  getDirectoryListWithPathList: (pathList_) => {
+    return getDirectoryListWithPath(joinPathList(pathList_));
   },
 
-  readFilePath:(path_) => {
-    return readFileSync( path_,'utf8');
+  writeFileWithPathList: (pathList_, content_) => {
+    writeFileWithPath(joinPathList(pathList_), content_);
+  },
+  readFileWithPathList: (pathList_) => {
+    return readFileWithPath(joinPathList(pathList_));
+  },
+  removeFileWithPathList: (pathList_) => {
+    return unlinkSync(joinPathList(pathList_));
   },
 
-  getTempFilePath: (filename_) => {
-    return join(tempDirectory,filename_);
+  getTempPathList: () => {
+    return [tempDirectory];
+  },
+  getFeaturePathList: () => {
+    return [__dirname, "..", "src", "features"];
   },
 
   //feature
 
-  getJsonFromFeatureFile:(section_,featureDir_,jsonFilename_)=>{
-    console.log(join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_));
-    return  JSON.parse(readFileSync( join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_)));
+  getJsonWithPathList: (pathList_) => {
+    return JSON.parse(readFileWithPath(joinPathList(pathList_)));
   },
-  saveFeatureJsonFile:(section_,featureDir_,jsonFilename_,obj_)=>{
-    
-    let content=JSON.stringify(obj_);
-
-    writeFileSync( join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_), content, err => {
-      if (err) {
-        console.error(err);
-      }
-      // file written successfully
-    });
-
+  saveJsonWithPathList: (pathList_, obj_) => {
+    writeFileWithPath(joinPathList(pathList_), JSON.stringify(obj_));
   },
 
-  
-
-  launchCommand: (command_)  => {
-
-    try{
+  launchCommand: (command_) => {
+    try {
       console.log(command_);
-      let output= execSync( command_).toString();
+      let output = execSync(command_).toString();
       return output;
-    }catch(e){
-      if( e.status!=0){
-        return 'Error: '+e.message;  
+    } catch (e) {
+      if (e.status != 0) {
+        return "Error: " + e.message;
       }
-      return 'Error uncatched';
+      return "Error uncatched";
     }
-  }
- 
-  
-})
+  },
+});
