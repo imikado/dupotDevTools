@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('nodejs', {
 
   getDirectoryList: (path_) => dirs(path_),
 
-  writeTempFile:(filename_,content_) => {
+  writeFilePath:(filename_,content_) => {
     writeFileSync(  filename_, content_, err => {
       if (err) {
         console.error(err);
@@ -35,11 +35,18 @@ contextBridge.exposeInMainWorld('nodejs', {
       // file written successfully
     });
   },
-  readTempFile:(filename_) => {
-    return readFileSync( filename_,'utf8');
+  readFeatureFileWithPathList:(pathList_) => {
+    return readFileSync( join(__dirname, pathList_),'utf8');
   },
-  removeFile:(filename_)=>{
+  readFileWithPathList:(pathList_) => {
+    return readFileSync( join( pathList_ ),'utf8');
+  },
+  removeFileWithPathList:(filename_)=>{
     return unlinkSync(filename_);
+  },
+
+  readFilePath:(path_) => {
+    return readFileSync( path_,'utf8');
   },
 
   getTempFilePath: (filename_) => {
@@ -47,6 +54,7 @@ contextBridge.exposeInMainWorld('nodejs', {
   },
 
   //feature
+
   getJsonFromFeatureFile:(section_,featureDir_,jsonFilename_)=>{
     console.log(join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_));
     return  JSON.parse(readFileSync( join(__dirname,'..','src','features',section_,featureDir_,jsonFilename_)));

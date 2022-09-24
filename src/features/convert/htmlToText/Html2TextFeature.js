@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import SystemApi from "../../../apis/SystemApi";
+import AppApi from "../../../apis/AppApi";
 import DatetimeApi from "../../../apis/DatetimeApi";
 
 import Settings from "./Settings";
@@ -12,11 +12,14 @@ import {
   FormControl,
   TextField,
 } from "@mui/material";
+import SystemApi from "../../../apis/SystemApi";
 
 const datetimeApi = new DatetimeApi();
 
-const systemApi = new SystemApi();
-systemApi.loadCard(card);
+const systemApi= new SystemApi();
+
+const appApi = new AppApi();
+appApi.loadCard(card);
 
 export default function Html2TextFeature() {
   const [input, setInput] = useState("");
@@ -27,8 +30,8 @@ export default function Html2TextFeature() {
   const [settingsObj, setSettingsObj] = useState({ binaryPath: "aa" });
 
   //command
-  const inputFile = systemApi.getTempFilePath("input");
-  const outputFile = systemApi.getTempFilePath("output");
+  const inputFile = appApi.getTempFilePath("input");
+  const outputFile = appApi.getTempFilePath("output");
   const command =
     settingsObj.binaryPath + " -o " + outputFile + " " + inputFile;
 
@@ -38,19 +41,19 @@ export default function Html2TextFeature() {
   const handleClose = () => setShow(false);
 
   const saveSettings = (settingsObj) => {
-    systemApi.saveJsonSettings(settingsObj);
+    appApi.saveJsonSettings(settingsObj);
   };
 
   useEffect(() => {
-    setSettingsObj(systemApi.readJsonSettings());
+    setSettingsObj(appApi.readJsonSettings());
   }, []);
 
   const convert = () => {
-    systemApi.writeTempFile(inputFile, input);
+    systemApi.writeFilePath(inputFile, input);
 
     let outputError = systemApi.launchCommand(command);
 
-    var outputConverted = systemApi.readTempFile(outputFile);
+    var outputConverted = systemApi.readFilePath(outputFile);
 
     if (outputError) {
       setOutput(outputError);

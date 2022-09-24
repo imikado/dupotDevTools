@@ -12,7 +12,7 @@ let routingContent=readFileSync(join('templates','routing.js'),'utf8');
 let templateImportList=[];
 let templateComponentList=[];
 
-const regexFeatureFile=/Feature/;
+const regexFeatureFile=/Feature.js/;
 
 let sectionDirList= dirs(featureDirectory);
 for(sectionDirKey in sectionDirList){

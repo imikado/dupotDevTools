@@ -12,11 +12,14 @@ import React, { useEffect, useState } from "react";
 import Settings from "./Settings";
 import card from "./card.json";
 
-import SystemApi from "../../../apis/SystemApi";
 import DatetimeApi from "../../../apis/DatetimeApi";
+import AppApi from "../../../apis/AppApi";
+import SystemApi from "../../../apis/SystemApi";
 
-const sytemApi = new SystemApi();
-sytemApi.loadCard(card);
+const systemApi = new SystemApi();
+
+const appApi = new AppApi();
+appApi.loadCard(card);
 
 const datetimeApi = new DatetimeApi();
 
@@ -42,15 +45,15 @@ export default function GetTldrFeature() {
   const handleClose = () => setShow(false);
 
   const saveSettings = (settingsObj) => {
-    sytemApi.saveJsonSettings(settingsObj);
+    appApi.saveJsonSettings(settingsObj);
   };
 
   useEffect(() => {
-    setSettingsObj(sytemApi.readJsonSettings());
+    setSettingsObj(appApi.readJsonSettings());
   }, []);
 
   const convert = () => {
-    let outputError = sytemApi.launchCommand(command + " " + input);
+    let outputError = systemApi.launchCommand(command + " " + input);
 
     var convert = new Convert({
       newline: true,

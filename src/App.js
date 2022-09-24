@@ -11,8 +11,8 @@ export default function App() {
 
       <Grid item  xs ><NavLeft /></Grid>
       <Grid item xs={10}  sx={{
-          "& .MuiTextField-root": { m: 1 },
-        }}>
+          "& .MuiTextField-root": { m: 1 }, 
+         }}>
           <Routing/>
         </Grid>
       </Grid>
