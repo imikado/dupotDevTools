@@ -7,7 +7,7 @@ const appApi=new AppApi();
 
 export default function NavLeft(){
 
-  const dirList= appApi.getSectionsList()
+  const sectionList= appApi.getSectionsList()
 
     return (
     
@@ -17,7 +17,7 @@ export default function NavLeft(){
       aria-label="vertical outlined button group"
       variant="contained"
     >
-             {dirList.map( 
+             {sectionList.map( 
                 (name)=>
                   <Button key={name} component={RouterLink} to={"section/"+name} href={"#"+name} >{name}</Button>
               )}

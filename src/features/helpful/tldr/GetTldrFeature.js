@@ -13,13 +13,13 @@ import Settings from "./Settings";
 import card from "./card.json";
 
 import DatetimeApi from "../../../apis/DatetimeApi";
-import AppApi from "../../../apis/AppApi";
+import FeatureApi from "../../../apis/FeatureApi";
 import SystemApi from "../../../apis/SystemApi";
 
 const systemApi = new SystemApi();
 
-const appApi = new AppApi();
-appApi.loadCard(card);
+const featureApi = new FeatureApi();
+featureApi.loadCard(card);
 
 const datetimeApi = new DatetimeApi();
 
@@ -45,11 +45,11 @@ export default function GetTldrFeature() {
   const handleClose = () => setShow(false);
 
   const saveSettings = (settingsObj) => {
-    appApi.saveJsonSettings(settingsObj);
+    featureApi.saveJsonSettings(settingsObj);
   };
 
   useEffect(() => {
-    setSettingsObj(appApi.readJsonSettings());
+    setSettingsObj(featureApi.readJsonSettings());
   }, []);
 
   const convert = () => {

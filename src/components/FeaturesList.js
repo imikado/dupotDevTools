@@ -26,7 +26,7 @@ export default function FeaturesList() {
                 <CardMedia
                   component="img"
                   height="250"
-                  image={ appApi.getIcon(featureObj.section.path, featureObj.name)}
+                  image={ appApi.getIconForSectionAndFeature(featureObj.section.path, featureObj.name)}
                   alt="green iguana"
 
 

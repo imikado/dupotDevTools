@@ -10,14 +10,14 @@ import {
   TextField,
 } from "@mui/material";
 
-import AppApi from "../../../apis/AppApi";
+import FeatureApi from "../../../apis/FeatureApi";
 import DatetimeApi from "../../../apis/DatetimeApi";
 import SystemApi from "../../../apis/SystemApi";
 
 const datetimeApi = new DatetimeApi();
 const systemApi = new SystemApi();
-const appApi = new AppApi();
-appApi.loadCard(card);
+const featureApi = new FeatureApi();
+featureApi.loadCard(card);
 
 export default function Html2TextFeature() {
   const [input, setInput] = useState("");
@@ -28,8 +28,8 @@ export default function Html2TextFeature() {
   const [settingsObj, setSettingsObj] = useState({ binaryPath: "aa" });
 
   //command
-  const inputFile = appApi.getTempFilePath("input");
-  const outputFile = appApi.getTempFilePath("output");
+  const inputFile = featureApi.getTempFilePath("input");
+  const outputFile = featureApi.getTempFilePath("output");
   const command =
     settingsObj.binaryPath + " -o " + outputFile + " " + inputFile;
 
@@ -39,11 +39,11 @@ export default function Html2TextFeature() {
   const handleClose = () => setShow(false);
 
   const saveSettings = (settingsObj) => {
-    appApi.saveJsonSettings(settingsObj);
+    featureApi.saveJsonSettings(settingsObj);
   };
 
   useEffect(() => {
-    setSettingsObj(appApi.readJsonSettings());
+    setSettingsObj(featureApi.readJsonSettings());
   }, []);
 
   const convert = () => {
