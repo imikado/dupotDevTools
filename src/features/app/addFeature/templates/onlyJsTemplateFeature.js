@@ -1,30 +1,34 @@
-import { Box, Button, ButtonGroup, FormControl, TextField } from "@mui/material";
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  FormControl,
+  TextField,
+} from "@mui/material";
 import React, { useState } from "react";
 
 import DatetimeApi from "../../../apis/DatetimeApi";
 
-const datetimeApi=new DatetimeApi();
+const datetimeApi = new DatetimeApi();
 
-export default function #TemplateFeature#() {
+export default function MyTemplateFeature() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
 
   const [status, setStatus] = useState();
 
   const convert = () => {
-
     //your code
-    let outputGenerated=input;
-    
-    setOutput('');
-    try{
-      setOutput(outputGenerated);
-    }catch(e){
-      console.log('Error'+e.message);
-    }
-    setStatus('Generated at '+datetimeApi.getTimeToString());
-  };
+    let outputGenerated = input;
 
+    setOutput("");
+    try {
+      setOutput(outputGenerated);
+    } catch (e) {
+      console.log("Error" + e.message);
+    }
+    setStatus("Generated at " + datetimeApi.getTimeToString());
+  };
 
   return (
     <>
@@ -54,12 +58,10 @@ export default function #TemplateFeature#() {
               <Button variant="contained" onClick={convert}>
                 Format
               </Button>
-
             </ButtonGroup>
           </div>
         </FormControl>
       </Box>
     </>
   );
- 
 }
