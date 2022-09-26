@@ -32,6 +32,7 @@ export default function YamlToJsonFeature() {
           <TextField
             label="Input"
             multiline
+            required
             rows={4}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -52,11 +53,11 @@ export default function YamlToJsonFeature() {
 
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-              <Button variant="contained" onClick={convertToYaml}>
+              <Button disabled={input==''} variant="contained" onClick={convertToYaml}>
                 Convert to YAML
               </Button>
 
-              <Button variant="contained" onClick={convertToJson}>
+              <Button disabled={input==''} variant="contained" onClick={convertToJson}>
                 Convert to JSON
               </Button>
             </ButtonGroup>

@@ -38,6 +38,7 @@ export default function UrlEncodingFeature() {
           <TextField
             label="Input"
             multiline
+            required
             rows={4}
             value={input}
             onChange={(e) => {
@@ -60,11 +61,11 @@ export default function UrlEncodingFeature() {
 
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-              <Button variant="contained" onClick={encode}>
+              <Button disabled={input==''} variant="contained" onClick={encode}>
                 Encode
               </Button>
 
-              <Button variant="contained" onClick={decode}>
+              <Button disabled={input==''} variant="contained" onClick={decode}>
                 Decode
               </Button>
             </ButtonGroup>

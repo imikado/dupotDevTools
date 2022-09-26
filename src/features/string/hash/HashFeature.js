@@ -41,6 +41,7 @@ export default function HashFeature() {
           <TextField
             label="Input"
             value={input}
+            required
             onChange={(e) => setInput(e.target.value)}
             helperText="Text to hash"
           />
@@ -73,7 +74,7 @@ export default function HashFeature() {
 
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-              <Button variant="contained" onClick={convert}>
+              <Button disabled={input==''} variant="contained" onClick={convert}>
                 Hash
               </Button>
             </ButtonGroup>

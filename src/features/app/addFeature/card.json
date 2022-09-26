@@ -1,0 +1,7 @@
+{
+    "description": "Add new feature",
+    "section": {
+        "path": "app"
+    },
+    "path": "addFeature"
+}

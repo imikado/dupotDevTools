@@ -6,11 +6,11 @@ const {
   writeFileSync,
   readFileSync,
   unlinkSync,
+  copyFileSync,
+  mkdirSync
 } = require("fs");
 const { join } = require("path");
 const { execSync } = require("child_process");
-
-var crypto = require("crypto");
 
 const joinPathList = (pathList_) => pathList_.join("/");
 const getDirectoryListWithPath = (p) =>
@@ -20,9 +20,23 @@ const writeFileWithPath = (path_, content_) => {
   writeFileSync(path_, content_, (err) => {
     if (err) {
       console.error(err);
+      return false;
     }
+    return true;
   });
 };
+const createDirectory = (path_) =>{
+  mkdirSync(path_, (err) => {
+    if (err) {
+      console.error(err);
+      return false;
+    }
+    return true;
+  });
+}
+const copyFile = (pathFrom,pathTo) => {
+  return copyFileSync(pathFrom,pathTo);
+}
 
 const tempDirectory = "/tmp";
 
@@ -59,6 +73,10 @@ contextBridge.exposeInMainWorld("nodejs", {
     return [__dirname, "..", "src", "features"];
   },
 
+  createDirectoryWithPathList:(pathList_)=>{
+    return createDirectory(joinPathList(pathList_));
+  },
+
   //feature
 
   getJsonWithPathList: (pathList_) => {
@@ -80,4 +98,8 @@ contextBridge.exposeInMainWorld("nodejs", {
       return "Error uncatched";
     }
   },
+
+  copyFileFromPathListToPathList:(fromPathList,toPathList)=>{
+    return copyFile(joinPathList(fromPathList),joinPathList(toPathList));
+  }
 });

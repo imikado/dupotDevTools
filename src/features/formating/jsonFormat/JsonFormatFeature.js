@@ -32,6 +32,7 @@ export default function JsonFormatFeature() {
           <TextField
             label="Input"
             multiline
+            required
             rows={4}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -50,7 +51,7 @@ export default function JsonFormatFeature() {
 
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-              <Button variant="contained" onClick={convert}>
+              <Button disabled={input==''} variant="contained" onClick={convert}>
                 Format
               </Button>
 

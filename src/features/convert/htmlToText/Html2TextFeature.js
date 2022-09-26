@@ -81,6 +81,7 @@ export default function Html2TextFeature() {
           <TextField
             label="Input"
             multiline
+            required
             rows={4}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -103,7 +104,7 @@ export default function Html2TextFeature() {
 
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-              <Button variant="contained" onClick={() => convert()}>
+              <Button disabled={input==''} variant="contained" onClick={() => convert()}>
                 Convert
               </Button>
             </ButtonGroup>

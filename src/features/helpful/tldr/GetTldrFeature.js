@@ -82,7 +82,7 @@ export default function GetTldrFeature() {
         <FormControl fullWidth>
           <TextField
             label="Input"
-            
+            required
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Enter text to convert"
@@ -92,7 +92,7 @@ export default function GetTldrFeature() {
           
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-              <Button variant="contained" onClick={() => convert()}>
+              <Button disabled={input==''} variant="contained" onClick={() => convert()}>
                 Search
               </Button>
             </ButtonGroup>

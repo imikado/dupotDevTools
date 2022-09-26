@@ -1,35 +1,30 @@
-import {
-  Box,
-  Button,
-  ButtonGroup,
-  FormControl,
-  TextField,
-} from "@mui/material";
+import { Box, Button, ButtonGroup, FormControl, TextField } from "@mui/material";
 import React, { useState } from "react";
 
 import DatetimeApi from "../../../apis/DatetimeApi";
 
-import format from "xml-formatter";
+const datetimeApi=new DatetimeApi();
 
-const datetimeApi = new DatetimeApi();
-
-export default function XmlFormatFeature() {
+export default function #TemplateFeature#() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
 
   const [status, setStatus] = useState();
 
   const convert = () => {
-    var outputConverted = format(input);
 
-    setOutput("");
-    try {
-      setOutput(outputConverted);
-    } catch (e) {
-      console.log("Error" + e.message);
+    //your code
+    let outputGenerated=input;
+    
+    setOutput('');
+    try{
+      setOutput(outputGenerated);
+    }catch(e){
+      console.log('Error'+e.message);
     }
-    setStatus("Formated at " + datetimeApi.getTimeToString());
+    setStatus('Generated at '+datetimeApi.getTimeToString());
   };
+
 
   return (
     <>
@@ -38,11 +33,10 @@ export default function XmlFormatFeature() {
           <TextField
             label="Input"
             multiline
-            required
             rows={4}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            helperText="XML to format"
+            helperText="JSON to format"
           />
 
           <TextField
@@ -57,13 +51,15 @@ export default function XmlFormatFeature() {
 
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-              <Button disabled={input==''} variant="contained" onClick={convert}>
+              <Button variant="contained" onClick={convert}>
                 Format
               </Button>
+
             </ButtonGroup>
           </div>
         </FormControl>
       </Box>
     </>
   );
+ 
 }
