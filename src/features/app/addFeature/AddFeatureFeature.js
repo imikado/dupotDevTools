@@ -31,6 +31,8 @@ export default function AddFeatureFeature() {
   const [name, setName] = useState("");
   const [section, setSection] = useState("");
   const [template, setTemplate] = useState("");
+  const [description, setDescription] = useState("");
+  const [binarypath, setBinarypath] = useState("");
 
   const [confirmationOpen, setConfirmationOpened] = useState(false);
   const [popupOpen, setPopupOpened] = useState(false);
@@ -48,15 +50,18 @@ export default function AddFeatureFeature() {
     );
   };
 
-  const openPopup = (title_,message_) =>{
+  const openPopup = (title_, message_) => {
     setPopupTitle(title_);
     setPopupMessage(message_);
     setPopupOpened(true);
-  }
+  };
 
   const askCreate = () => {
     if (appApi.existFeatureInSection(name, section)) {
-      openPopup("Error when try to create","Feature " + name + " already exist !");
+      openPopup(
+        "Error when try to create",
+        "Feature " + name + " already exist !"
+      );
       return;
     }
     setConfirmationOpened(true);
@@ -87,12 +92,13 @@ export default function AddFeatureFeature() {
       section
     );
 
-    let sourcePathList=featureApi.getCurrentPathList();
+    let sourcePathList = featureApi.getCurrentPathList();
 
     let newFeaturePathList = appApi.getFeaturePathList();
     newFeaturePathList.push(section);
     newFeaturePathList.push(name);
 
+    //icons
     let fromIconPathList = sourcePathList.slice();
     fromIconPathList.push("assets");
     fromIconPathList.push("icon.png");
@@ -102,20 +108,41 @@ export default function AddFeatureFeature() {
 
     appApi.copyFileFromPathListToPathList(fromIconPathList, toIconPathList);
 
-    if (template == "commandTemplateFeature.js") {
-      console.log('command line');
-      let fromSettingsJsonPathList = sourcePathList.slice();
-      fromSettingsJsonPathList.push("assets");
-      fromSettingsJsonPathList.push("settings.json");
+    //card
+    let cardTemplateContent = featureApi.readFileWithPathList(
+      ["assets", "card.json"],
+      "utf8"
+    );
+    let cardContent = cardTemplateContent.replace(
+      "descriptionpattern",
+      description
+    );
+    appApi.writeFileInFeatureAndSection(
+      "card.json",
+      cardContent,
+      name,
+      section
+    );
 
-      let toSettingsJsonPathList = newFeaturePathList.slice();
-      toSettingsJsonPathList.push("settings.json");
-
-      appApi.copyFileFromPathListToPathList(
-        fromSettingsJsonPathList,
-        toSettingsJsonPathList
+    if (template === "commandTemplateFeature.js") {
+      console.log("command line");
+      //settings
+      let settingsJsonTemplateContent = featureApi.readFileWithPathList(
+        ["assets", "settings.json"],
+        "utf8"
+      );
+      let settingsJsonContent = settingsJsonTemplateContent.replace(
+        "yourbinarypattern",
+        binarypath
+      );
+      appApi.writeFileInFeatureAndSection(
+        "settings.json",
+        settingsJsonContent,
+        name,
+        section
       );
 
+      //settings js
       let fromSettingsJsPathList = sourcePathList.slice();
       fromSettingsJsPathList.push("assets");
       fromSettingsJsPathList.push("Settings.js");
@@ -140,7 +167,7 @@ export default function AddFeatureFeature() {
   };
 
   const isValid = () => {
-    if (name != "" && section != "" && template != "") {
+    if (name !== "" && section !== "" && template !== "") {
       return true;
     }
     return false;
@@ -171,6 +198,17 @@ export default function AddFeatureFeature() {
             helperText="Name of feature"
           />
         </FormControl>
+
+        <FormControl fullWidth sx={{ marginLeft: 1, marginTop: 2 }}>
+          <TextField
+            label="Description"
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            helperText="Description of the feature"
+          />
+        </FormControl>
+
         <FormControl fullWidth sx={{ marginLeft: 1, marginTop: 2 }}>
           <InputLabel id="section-select-label">Section</InputLabel>
           <Select
@@ -200,7 +238,7 @@ export default function AddFeatureFeature() {
               control={<Radio />}
               label="Only JS"
             />
-          
+
             <FormControlLabel
               value="commandTemplateFeature.js"
               control={<Radio />}
@@ -208,6 +246,19 @@ export default function AddFeatureFeature() {
             />
           </RadioGroup>
         </FormControl>
+
+        {template === "commandTemplateFeature.js" && (
+          <FormControl fullWidth sx={{ marginLeft: 1, marginTop: 2 }}>
+            <TextField
+              label="Binary path"
+              required
+              value={binarypath}
+              onChange={(e) => setBinarypath(e.target.value)}
+              helperText="path of the binary"
+            />
+          </FormControl>
+        )}
+
         <FormControl fullWidth>
           <p>{status}</p>
 
