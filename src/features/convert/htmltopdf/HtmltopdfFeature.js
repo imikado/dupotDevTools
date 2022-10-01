@@ -47,8 +47,12 @@ export default function HtmltopdfFeature() {
     setSettingsObj(featureApi.readJsonSettings());
   }, []);
 
+  const reset= ()=>{
+    setGenId("");
+    setStatus("");
+  }
+
   const launch = () => {
-    //your code
     systemApi.writeFilePath(inputFile, input);
 
     systemApi.launchCommand(command);
@@ -82,11 +86,13 @@ export default function HtmltopdfFeature() {
             rows={4}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onFocus={reset}
             helperText="HTML to convert"
           />
 
-         <iframe style={{height:350}} src={"file://"+outputFile+"?&id="+genId}></iframe>
-
+        {input!="" && genId &&
+         <iframe style={{height:350,border:1,backgroundColor:"#222"}} src={"file://"+outputFile+"?&id="+genId}></iframe>
+        }
           <p>{status}</p>
 
           <div style={{ textAlign: "center" }}>

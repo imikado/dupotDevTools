@@ -8,6 +8,7 @@ import Page404 from '../components/Page404';
 
 import AddFeatureFeature from '../features/app/addFeature/AddFeatureFeature'; 
 import Html2TextFeature from '../features/convert/htmlToText/Html2TextFeature'; 
+import HtmltopdfFeature from '../features/convert/htmltopdf/HtmltopdfFeature'; 
 import YamlToJsonFeature from '../features/convert/yaml-Json/YamlToJsonFeature'; 
 import HtmlEncodingFeature from '../features/encoding/htmlEncoding/HtmlEncodingFeature'; 
 import UrlEncodingFeature from '../features/encoding/urlEncoding/UrlEncodingFeature'; 
@@ -28,6 +29,7 @@ export default function Routing() {
         
 <Route path="/section/app/addFeature/" element={<AddFeatureFeature />} />  
 <Route path="/section/convert/htmlToText/" element={<Html2TextFeature />} />  
+<Route path="/section/convert/htmltopdf/" element={<HtmltopdfFeature />} />  
 <Route path="/section/convert/yaml-Json/" element={<YamlToJsonFeature />} />  
 <Route path="/section/encoding/htmlEncoding/" element={<HtmlEncodingFeature />} />  
 <Route path="/section/encoding/urlEncoding/" element={<UrlEncodingFeature />} />  

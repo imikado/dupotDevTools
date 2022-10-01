@@ -62,4 +62,11 @@ export default class AppApi {
       settingsObj_
     );
   }
+
+  async showOpenDialogFile(){
+
+    return await nodejs.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
+  }
+
+
 }

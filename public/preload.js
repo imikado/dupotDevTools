@@ -1,4 +1,4 @@
-const { contextBridge } = require("electron");
+const { contextBridge,ipcRenderer } = require("electron");
 
 const {
   readdirSync,
@@ -11,6 +11,7 @@ const {
 } = require("fs");
 const { join } = require("path");
 const { execSync } = require("child_process");
+
 
 const joinPathList = (pathList_) => pathList_.join("/");
 const getDirectoryListWithPath = (p) =>
@@ -101,5 +102,9 @@ contextBridge.exposeInMainWorld("nodejs", {
 
   copyFileFromPathListToPathList:(fromPathList,toPathList)=>{
     return copyFile(joinPathList(fromPathList),joinPathList(toPathList));
+  },
+
+  showOpenDialog:(options)=>{
+    return ipcRenderer.invoke('dialog:openFile');
   }
 });
