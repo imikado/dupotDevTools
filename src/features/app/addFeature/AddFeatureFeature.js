@@ -40,6 +40,8 @@ export default function AddFeatureFeature() {
   const [popupTitle, setPopupTitle] = useState("");
   const [popupMessage, setPopupMessage] = useState("");
 
+  const [confirmationTitle, setConfirmationTitle] = useState("");
+
   const [status, setStatus] = useState();
 
   const sectionList = appApi.getSectionsList();
@@ -56,6 +58,11 @@ export default function AddFeatureFeature() {
     setPopupOpened(true);
   };
 
+  const openConfirmation=(title_) =>{
+    setConfirmationTitle(title_);
+    setConfirmationOpened(true);
+  };
+
   const askCreate = () => {
     if (appApi.existFeatureInSection(name, section)) {
       openPopup(
@@ -64,7 +71,7 @@ export default function AddFeatureFeature() {
       );
       return;
     }
-    setConfirmationOpened(true);
+    openConfirmation('Do you confirm create '+name);
   };
 
   const create = () => {
@@ -176,7 +183,7 @@ export default function AddFeatureFeature() {
   return (
     <>
       <Confirmation
-        title="Do you confirm ?"
+        title={confirmationTitle}
         open={confirmationOpen}
         handleClose={() => setConfirmationOpened(false)}
         handleAccept={create}

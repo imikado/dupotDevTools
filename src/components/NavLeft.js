@@ -19,7 +19,7 @@ export default function NavLeft(){
     >
              {sectionList.map( 
                 (name)=>
-                  <Button key={name} component={RouterLink} to={"section/"+name} href={"#"+name} >{name}</Button>
+                  <Button key={name} component={RouterLink} to={"section/"+name} href={"#section/"+name} >{name}</Button>
               )}
 
     </ButtonGroup>

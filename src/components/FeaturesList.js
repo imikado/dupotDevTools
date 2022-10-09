@@ -1,6 +1,6 @@
 import { Box, Button, Card, CardActionArea, CardContent, CardMedia, Grid, Typography } from '@mui/material';
 import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 
 import AppApi from '../apis/AppApi';
 
@@ -20,8 +20,8 @@ export default function FeaturesList() {
 
             <Grid key={featureObj.name}  item xs={4}>
             <Card >
-              <CardActionArea
-              href={"/section/"+section+"/"+featureObj.name} to={"#section_"+section+'_'+featureObj.name}
+              <CardActionArea component={RouterLink}
+              href={"#section_"+section+'_'+featureObj.name} to={"/section/"+section+'/'+featureObj.name}
               >
                 <CardMedia
                   component="img"
