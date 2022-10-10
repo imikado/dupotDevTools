@@ -15,6 +15,7 @@ import UrlEncodingFeature from '../features/encoding/urlEncoding/UrlEncodingFeat
 import JsonFormatFeature from '../features/formating/jsonFormat/JsonFormatFeature'; 
 import SqlFormatFeature from '../features/formating/sqlFormat/SqlFormatFeature'; 
 import XmlFormatFeature from '../features/formating/xmlFormat/XmlFormatFeature'; 
+import GraphvizFeature from '../features/graphics/graphviz/GraphvizFeature'; 
 import GetTldrFeature from '../features/helpful/tldr/GetTldrFeature'; 
 import HashFeature from '../features/string/hash/HashFeature'; 
 //import #FeatureClass# from '../features/#section#/#feature#/#FeatureClass#';
@@ -35,6 +36,7 @@ export default function Routing() {
 <Route path="/section/formating/jsonFormat/" element={<JsonFormatFeature />} />  
 <Route path="/section/formating/sqlFormat/" element={<SqlFormatFeature />} />  
 <Route path="/section/formating/xmlFormat/" element={<XmlFormatFeature />} />  
+<Route path="/section/graphics/graphviz/" element={<GraphvizFeature />} />  
 <Route path="/section/helpful/tldr/" element={<GetTldrFeature />} />  
 <Route path="/section/string/hash/" element={<HashFeature />} />  
         
