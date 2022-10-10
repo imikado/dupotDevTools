@@ -47,6 +47,10 @@ export default function Html2TextFeature() {
   }, []);
 
   const convert = () => {
+    if ( !systemApi.doesBinaryExist(settingsObj.binaryPath)){
+      return window.alert(settingsObj.binaryPath+' is missing, please install it before');
+    }
+    
     systemApi.writeFilePath(inputFile, input);
 
     let outputError = systemApi.launchCommand(command);

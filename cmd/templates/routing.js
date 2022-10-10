@@ -15,13 +15,13 @@ import Page404 from '../components/Page404';
 export default function Routing() {
   return (
     <Routes>
-        <Route path="/" element={<Home />} />
         
 <ROUTES_LOOP></ROUTES_LOOP>
         
         <Route path="/section/:section" element={<FeaturesList />} />
 
-        <Route path="*" element={<Page404 />} />
+        <Route path="*" element={<Home />} />
+
     </Routes>
   );
 }

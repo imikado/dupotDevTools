@@ -13,7 +13,13 @@ export default class SystemApi{
         return nodejs.launchCommand(command_);
     }
 
-
+    doesBinaryExist(binary_){
+        let output=nodejs.launchCommand('which '+binary_);
+        if(output.substr(0,5)!=='Error'){
+            return true;
+        }
+        return false;
+    }
     
 
 };

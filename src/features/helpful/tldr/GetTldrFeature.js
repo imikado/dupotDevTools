@@ -26,8 +26,6 @@ const datetimeApi = new DatetimeApi();
 const Convert = require("ansi-to-html");
 
 export default function GetTldrFeature() {
-  const section = "helpful";
-  const feature = "tldr";
 
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
@@ -52,8 +50,26 @@ export default function GetTldrFeature() {
     setSettingsObj(featureApi.readJsonSettings());
   }, []);
 
+  
+  const update = () => {
+
+    let outputError = systemApi.launchCommand( command+" -u ");
+
+    var convert = new Convert({
+      newline: true,
+    });
+    setOutput(convert.toHtml(outputError));
+
+    setStatus("Displayed at " + datetimeApi.getTimeToString());
+  };
+
   const convert = () => {
-    let outputError = systemApi.launchCommand(command + " " + input);
+
+    if ( !systemApi.doesBinaryExist(settingsObj.binaryPath)){
+      return window.alert(settingsObj.binaryPath+' is missing, please install it before');
+    }
+
+    let outputError = systemApi.launchCommand( command+" " + input);
 
     var convert = new Convert({
       newline: true,
@@ -75,6 +91,11 @@ export default function GetTldrFeature() {
 
       <Box component="form" noValidate autoComplete="off">
         <div style={{ textAlign: "right" }}>
+
+          <Button variant="primary" onClick={update}>
+            Refresh
+          </Button>
+
           <Button variant="default" onClick={handleShow}>
             Settings
           </Button>
@@ -92,7 +113,7 @@ export default function GetTldrFeature() {
           
           <div style={{ textAlign: "center" }}>
             <ButtonGroup>
-              <Button disabled={input==''} variant="contained" onClick={() => convert()}>
+              <Button disabled={input===''} variant="contained" onClick={() => convert()}>
                 Search
               </Button>
             </ButtonGroup>

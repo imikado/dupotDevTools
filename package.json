@@ -2,7 +2,6 @@
   "name": "dupot-dev-tools",
   "productName": "dupot-dev-tools",
   "homepage": "./",
-
   "description": "Dev tool to simplify our work",
   "version": "0.1.0",
   "license": "LGPLv2",
@@ -84,9 +83,19 @@
           "platforms": [
             "darwin"
           ]
-        } 
-        
-        
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "config": {
+            "options": {
+              "icon": "src/icons/logo512.png"
+            }
+          }
+        },
+        {
+          "name": "@electron-forge/maker-rpm",
+          "config": {}
+        }
       ]
     }
   }

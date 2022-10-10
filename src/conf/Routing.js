@@ -25,7 +25,6 @@ import HashFeature from '../features/string/hash/HashFeature';
 export default function Routing() {
   return (
     <Routes>
-        <Route path="/" element={<Home />} />
         
 <Route path="/section/app/addFeature/" element={<AddFeatureFeature />} />  
 <Route path="/section/convert/htmlToText/" element={<Html2TextFeature />} />  
@@ -41,7 +40,8 @@ export default function Routing() {
         
         <Route path="/section/:section" element={<FeaturesList />} />
 
-        <Route path="*" element={<Page404 />} />
+        <Route path="*" element={<Home />} />
+
     </Routes>
   );
 }
