@@ -3,6 +3,8 @@ const path = require('path');
 const { app, BrowserWindow,dialog,ipcMain,protocol } = require('electron');
 const isDev = require('electron-is-dev');
 
+let mainWindow;
+
 function createWindow() {
   const win = new BrowserWindow({
     autoHideMenuBar:true,
@@ -31,13 +33,22 @@ function createWindow() {
   if (isDev) {
     win.webContents.openDevTools({ mode: 'detach' });
   }
+
+  return win;
 }
 
 async function handleFileOpen() {
-  const { canceled, filePaths } = await dialog.showOpenDialog()
+  mainWindow.minimize();
+  
+  const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(),{ properties: ['openFile' ] })
+  
+  mainWindow.restore();
+
   if (canceled) {
+
     return
   } else {
+
     return filePaths[0]
   }
 }
@@ -46,8 +57,11 @@ async function handleFileOpen() {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then( () =>{
+  
+  mainWindow = createWindow();
+
   ipcMain.handle('dialog:openFile', handleFileOpen)
-  createWindow();
+  
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

@@ -53,6 +53,10 @@ export default function HtmltopdfFeature() {
   }
 
   const launch = () => {
+    if ( !systemApi.doesBinaryExist(settingsObj.binaryPath)){
+      return window.alert(settingsObj.binaryPath+' is missing, please install it before');
+    }
+    
     systemApi.writeFilePath(inputFile, input);
 
     systemApi.launchCommand(command);

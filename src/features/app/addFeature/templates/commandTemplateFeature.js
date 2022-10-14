@@ -5,7 +5,7 @@ import {
   FormControl,
   TextField,
 } from "@mui/material";
-import React, { useState,useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 import FeatureApi from "../../../apis/FeatureApi";
 import DatetimeApi from "../../../apis/DatetimeApi";
@@ -48,8 +48,10 @@ export default function MyTemplateFeature() {
   }, []);
 
   const launch = () => {
-    if ( !systemApi.doesBinaryExist(settingsObj.binaryPath)){
-      return window.alert(settingsObj.binaryPath+' is missing, please install it before');
+    if (!systemApi.doesBinaryExist(settingsObj.binaryPath)) {
+      return window.alert(
+        settingsObj.binaryPath + " is missing, please install it before"
+      );
     }
     //your code
     systemApi.writeFilePath(inputFile, input);
@@ -77,6 +79,12 @@ export default function MyTemplateFeature() {
       />
 
       <Box component="form" noValidate autoComplete="off">
+        <div style={{ textAlign: "right" }}>
+          <Button variant="default" onClick={handleShow}>
+            Settings
+          </Button>
+        </div>
+
         <FormControl fullWidth>
           <TextField
             label="Input"
