@@ -1,0 +1,7 @@
+{
+    "description": "Parse csv file",
+    "section": {
+        "path": "parsing"
+    },
+    "path": "xsv-parsing-csv"
+}

@@ -63,9 +63,15 @@ export default class AppApi {
     );
   }
 
-  async showOpenDialogFile(){
+  async showOpenDialogFile(filtersList){
 
-    return await nodejs.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
+    if(filtersList){
+      return await nodejs.showOpenDialog({ filters:filtersList, properties: ['openFile', 'multiSelections'] });
+
+    }else{
+      return await nodejs.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
+
+    }
   }
 
 

@@ -105,6 +105,6 @@ contextBridge.exposeInMainWorld("nodejs", {
   },
 
   showOpenDialog:(options)=>{
-    return ipcRenderer.invoke('dialog:openFile');
+    return ipcRenderer.invoke('dialog:openFile',options);
   }
 });

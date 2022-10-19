@@ -17,6 +17,7 @@ import SqlFormatFeature from '../features/formating/sqlFormat/SqlFormatFeature';
 import XmlFormatFeature from '../features/formating/xmlFormat/XmlFormatFeature'; 
 import GraphvizFeature from '../features/graphics/graphviz/GraphvizFeature'; 
 import GetTldrFeature from '../features/helpful/tldr/GetTldrFeature'; 
+import XsvparsingcsvFeature from '../features/parsing/xsv-parsing-csv/XsvparsingcsvFeature'; 
 import HashFeature from '../features/string/hash/HashFeature'; 
 //import #FeatureClass# from '../features/#section#/#feature#/#FeatureClass#';
 
@@ -38,6 +39,7 @@ export default function Routing() {
 <Route path="/section/formating/xmlFormat/" element={<XmlFormatFeature />} />  
 <Route path="/section/graphics/graphviz/" element={<GraphvizFeature />} />  
 <Route path="/section/helpful/tldr/" element={<GetTldrFeature />} />  
+<Route path="/section/parsing/xsv-parsing-csv/" element={<XsvparsingcsvFeature />} />  
 <Route path="/section/string/hash/" element={<HashFeature />} />  
         
         <Route path="/section/:section" element={<FeaturesList />} />

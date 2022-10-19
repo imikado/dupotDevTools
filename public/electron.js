@@ -37,10 +37,10 @@ function createWindow() {
   return win;
 }
 
-async function handleFileOpen() {
+async function handleFileOpen(event,options) {
   mainWindow.minimize();
   
-  const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(),{ properties: ['openFile' ] })
+  const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(),options)
   
   mainWindow.restore();
 
