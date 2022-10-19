@@ -11,6 +11,7 @@ import Html2TextFeature from '../features/convert/htmlToText/Html2TextFeature';
 import HtmltopdfFeature from '../features/convert/htmltopdf/HtmltopdfFeature'; 
 import YamlToJsonFeature from '../features/convert/yaml-Json/YamlToJsonFeature'; 
 import HtmlEncodingFeature from '../features/encoding/htmlEncoding/HtmlEncodingFeature'; 
+import JwtdecodeFeature from '../features/encoding/jwtDecode/JwtdecodeFeature'; 
 import UrlEncodingFeature from '../features/encoding/urlEncoding/UrlEncodingFeature'; 
 import JsonFormatFeature from '../features/formating/jsonFormat/JsonFormatFeature'; 
 import SqlFormatFeature from '../features/formating/sqlFormat/SqlFormatFeature'; 
@@ -33,6 +34,7 @@ export default function Routing() {
 <Route path="/section/convert/htmltopdf/" element={<HtmltopdfFeature />} />  
 <Route path="/section/convert/yaml-Json/" element={<YamlToJsonFeature />} />  
 <Route path="/section/encoding/htmlEncoding/" element={<HtmlEncodingFeature />} />  
+<Route path="/section/encoding/jwtDecode/" element={<JwtdecodeFeature />} />  
 <Route path="/section/encoding/urlEncoding/" element={<UrlEncodingFeature />} />  
 <Route path="/section/formating/jsonFormat/" element={<JsonFormatFeature />} />  
 <Route path="/section/formating/sqlFormat/" element={<SqlFormatFeature />} />  

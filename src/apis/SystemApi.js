@@ -20,6 +20,10 @@ export default class SystemApi{
         }
         return false;
     }
+
+    jwtDecode(jwtToken){
+        return nodejs.jwtDecode(jwtToken);
+    }
     
 
 };

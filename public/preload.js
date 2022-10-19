@@ -106,5 +106,12 @@ contextBridge.exposeInMainWorld("nodejs", {
 
   showOpenDialog:(options)=>{
     return ipcRenderer.invoke('dialog:openFile',options);
+  },
+
+  jwtDecode:(jwtToken)=>{
+    
+    const jwt_decode = require('jwt-decode');
+
+    return jwt_decode(jwtToken, { header: true });
   }
 });
