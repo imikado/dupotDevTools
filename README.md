@@ -14,9 +14,11 @@ Need to install packages:
 * wkhtmltopdf
 * graphviz
 * tldr
+* xsv
 
 You can, if your system is based on debian (ubuntu, linux mint, debian..)
 ```
 sudo apt-get install html2text wkhtmltopdf tldr graphviz
 ```
 
+For xsv, you could find it here:https://github.com/BurntSushi/xsv
