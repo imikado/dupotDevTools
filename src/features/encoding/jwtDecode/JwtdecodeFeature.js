@@ -21,7 +21,7 @@ export default function JwtdecodeFeature() {
 
   const convert = () => {
     //your code
-    let outputGenerated = JSON.stringify(systemApi.jwtDecode( input), null,4);
+    let outputGenerated = JSON.stringify(systemApi.jwtDecode(input), null, 4);
     console.log(outputGenerated);
 
     setOutput("");
@@ -43,7 +43,7 @@ export default function JwtdecodeFeature() {
             rows={4}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            helperText="JSON to format"
+            helperText="JWT to decode"
           />
 
           <TextField
