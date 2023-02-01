@@ -13,6 +13,7 @@ import YamlToJsonFeature from '../features/convert/yaml-Json/YamlToJsonFeature';
 import HtmlEncodingFeature from '../features/encoding/htmlEncoding/HtmlEncodingFeature'; 
 import JwtdecodeFeature from '../features/encoding/jwtDecode/JwtdecodeFeature'; 
 import UrlEncodingFeature from '../features/encoding/urlEncoding/UrlEncodingFeature'; 
+import GraphqlFormatFeature from '../features/formating/graphqlFormat/GraphqlFormatFeature'; 
 import JsonFormatFeature from '../features/formating/jsonFormat/JsonFormatFeature'; 
 import SqlFormatFeature from '../features/formating/sqlFormat/SqlFormatFeature'; 
 import XmlFormatFeature from '../features/formating/xmlFormat/XmlFormatFeature'; 
@@ -36,6 +37,7 @@ export default function Routing() {
 <Route path="/section/encoding/htmlEncoding/" element={<HtmlEncodingFeature />} />  
 <Route path="/section/encoding/jwtDecode/" element={<JwtdecodeFeature />} />  
 <Route path="/section/encoding/urlEncoding/" element={<UrlEncodingFeature />} />  
+<Route path="/section/formating/graphqlFormat/" element={<GraphqlFormatFeature />} />  
 <Route path="/section/formating/jsonFormat/" element={<JsonFormatFeature />} />  
 <Route path="/section/formating/sqlFormat/" element={<SqlFormatFeature />} />  
 <Route path="/section/formating/xmlFormat/" element={<XmlFormatFeature />} />  
