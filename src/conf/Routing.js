@@ -10,6 +10,7 @@ import AddFeatureFeature from '../features/app/addFeature/AddFeatureFeature';
 import Html2TextFeature from '../features/convert/htmlToText/Html2TextFeature'; 
 import HtmltopdfFeature from '../features/convert/htmltopdf/HtmltopdfFeature'; 
 import YamlToJsonFeature from '../features/convert/yaml-Json/YamlToJsonFeature'; 
+import Base64encodingFeature from '../features/encoding/base64encoding/Base64encodingFeature'; 
 import HtmlEncodingFeature from '../features/encoding/htmlEncoding/HtmlEncodingFeature'; 
 import JwtdecodeFeature from '../features/encoding/jwtDecode/JwtdecodeFeature'; 
 import UrlEncodingFeature from '../features/encoding/urlEncoding/UrlEncodingFeature'; 
@@ -34,6 +35,7 @@ export default function Routing() {
 <Route path="/section/convert/htmlToText/" element={<Html2TextFeature />} />  
 <Route path="/section/convert/htmltopdf/" element={<HtmltopdfFeature />} />  
 <Route path="/section/convert/yaml-Json/" element={<YamlToJsonFeature />} />  
+<Route path="/section/encoding/base64encoding/" element={<Base64encodingFeature />} />  
 <Route path="/section/encoding/htmlEncoding/" element={<HtmlEncodingFeature />} />  
 <Route path="/section/encoding/jwtDecode/" element={<JwtdecodeFeature />} />  
 <Route path="/section/encoding/urlEncoding/" element={<UrlEncodingFeature />} />  

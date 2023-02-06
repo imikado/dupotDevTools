@@ -23,6 +23,20 @@ export default class AppApi {
     return featureList;
   }
 
+  getFeaturesList() {
+    let entireFeatureList = [];
+    let sectionList = this.getSectionsList();
+    for (let sectionKeyLoop in sectionList) {
+      let sectionLoop = sectionList[sectionKeyLoop];
+      let featureInSectionList = this.getFeaturesListInSection(sectionLoop);
+      for (let featureInSectionKeyLoop in featureInSectionList) {
+        entireFeatureList.push(featureInSectionList[featureInSectionKeyLoop]);
+      }
+    }
+    console.log(entireFeatureList);
+    return entireFeatureList;
+  }
+
   getIconForSectionAndFeature(section, feature) {
     let iconPathList = nodejs
       .getFeaturePathList()
@@ -43,7 +57,7 @@ export default class AppApi {
     return false;
   }
 
-  getFeaturePathList(){
+  getFeaturePathList() {
     return nodejs.getFeaturePathList();
   }
 
@@ -55,18 +69,16 @@ export default class AppApi {
     return nodejs.createDirectoryWithPathList(sectionPathList);
   }
 
-  writeFileInFeatureAndSection(filename,content,feature,section){
-
+  writeFileInFeatureAndSection(filename, content, feature, section) {
     let pathList = nodejs.getFeaturePathList();
     pathList.push(section);
     pathList.push(feature);
     pathList.push(filename);
 
     return nodejs.writeFileWithPathList(pathList, content);
-
   }
 
-  copyFileFromPathListToPathList(fromPathList,toPathList){
-    return nodejs.copyFileFromPathListToPathList(fromPathList,toPathList);
+  copyFileFromPathListToPathList(fromPathList, toPathList) {
+    return nodejs.copyFileFromPathListToPathList(fromPathList, toPathList);
   }
 }

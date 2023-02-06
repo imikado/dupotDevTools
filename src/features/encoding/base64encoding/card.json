@@ -1,0 +1,7 @@
+{
+    "description": "Encode/Decode in Base64",
+    "section": {
+        "path": "encoding"
+    },
+    "path": "base64encoding"
+}

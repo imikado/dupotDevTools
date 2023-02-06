@@ -1,4 +1,4 @@
-const { contextBridge,ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 const {
   readdirSync,
@@ -7,11 +7,10 @@ const {
   readFileSync,
   unlinkSync,
   copyFileSync,
-  mkdirSync
+  mkdirSync,
 } = require("fs");
 const { join } = require("path");
 const { execSync } = require("child_process");
-
 
 const joinPathList = (pathList_) => pathList_.join("/");
 const getDirectoryListWithPath = (p) =>
@@ -26,7 +25,7 @@ const writeFileWithPath = (path_, content_) => {
     return true;
   });
 };
-const createDirectory = (path_) =>{
+const createDirectory = (path_) => {
   mkdirSync(path_, (err) => {
     if (err) {
       console.error(err);
@@ -34,21 +33,18 @@ const createDirectory = (path_) =>{
     }
     return true;
   });
-}
-const copyFile = (pathFrom,pathTo) => {
-  return copyFileSync(pathFrom,pathTo);
-}
+};
+const copyFile = (pathFrom, pathTo) => {
+  return copyFileSync(pathFrom, pathTo);
+};
 
 const tempDirectory = "/tmp";
 
 contextBridge.exposeInMainWorld("nodejs", {
-
-
-  getFilePathWithPathList: (pathList) =>{
-
+  getFilePathWithPathList: (pathList) => {
     return "file:///" + joinPathList(pathList);
   },
- 
+
   getJoinPathList: (pathList) => {
     return joinPathList(pathList);
   },
@@ -74,7 +70,7 @@ contextBridge.exposeInMainWorld("nodejs", {
     return [__dirname, "..", "src", "features"];
   },
 
-  createDirectoryWithPathList:(pathList_)=>{
+  createDirectoryWithPathList: (pathList_) => {
     return createDirectory(joinPathList(pathList_));
   },
 
@@ -100,18 +96,26 @@ contextBridge.exposeInMainWorld("nodejs", {
     }
   },
 
-  copyFileFromPathListToPathList:(fromPathList,toPathList)=>{
-    return copyFile(joinPathList(fromPathList),joinPathList(toPathList));
+  copyFileFromPathListToPathList: (fromPathList, toPathList) => {
+    return copyFile(joinPathList(fromPathList), joinPathList(toPathList));
   },
 
-  showOpenDialog:(options)=>{
-    return ipcRenderer.invoke('dialog:openFile',options);
+  showOpenDialog: (options) => {
+    return ipcRenderer.invoke("dialog:openFile", options);
   },
 
-  jwtDecode:(jwtToken)=>{
-    
-    const jwt_decode = require('jwt-decode');
+  jwtDecode: (jwtToken) => {
+    const jwt_decode = require("jwt-decode");
 
     return jwt_decode(jwtToken, { header: true });
-  }
+  },
+
+  base64Decode: (base64Encoded) => {
+    var base64 = require("base-64");
+    return base64.decode(base64Encoded);
+  },
+  base64Encode: (base64ToEncode) => {
+    var base64 = require("base-64");
+    return base64.encode(base64ToEncode);
+  },
 });
