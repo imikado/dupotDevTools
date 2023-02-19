@@ -22,6 +22,8 @@ const systemApi = new SystemApi();
 const featureApi = new FeatureApi();
 featureApi.loadCard(card);
 
+const decoder = new TextDecoder("utf-8");
+
 export default function NfcToolFeature() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
@@ -78,7 +80,7 @@ export default function NfcToolFeature() {
         getCommandOutput("read " + i)
       );
     }
-    return outputCommand;
+    return decode_utf8(outputCommand);
   };
 
   const extractBlockTextFromOutput = (outputCommandToExtract) => {
@@ -90,11 +92,19 @@ export default function NfcToolFeature() {
       if (lineLoop.substr(0, 5) == "block") {
         let detailLineList = lineLoop.split("|");
 
-        extractText += detailLineList[1];
+        extractText += detailLineList[1].trim();
       }
     }
     return extractText;
   };
+
+  function encode_utf8(s) {
+    return decoder.encode(s);
+  }
+
+  function decode_utf8(s) {
+    return unescape(s);
+  }
 
   const hasInfo = () => {
     let uid = getUid();
