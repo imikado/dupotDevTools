@@ -32,6 +32,8 @@ export default function NfcToolFeature() {
 
   const [settingsObj, setSettingsObj] = useState({ binaryPath: "aa" });
 
+  const [cardPresent, setCardPresent] = useState(false);
+
   //command
   const inputFile = featureApi.getTempFilePath("input");
   const outputFile = featureApi.getTempFilePath("output");
@@ -49,11 +51,7 @@ export default function NfcToolFeature() {
 
   useEffect(() => {
     setSettingsObj(featureApi.readJsonSettings());
-
-    if (hasInfo()) {
-      displayTabInfo();
-    }
-  }, [settingsObj.binaryPath]);
+  }, []);
 
   const getUid = () => {
     let outputCommand = getCommandOutput("getuid");
@@ -119,6 +117,7 @@ export default function NfcToolFeature() {
 
   const displayTabInfo = () => {
     selectTab("info");
+    setCardPresent(true);
 
     let outputCommand = getInfo();
 
@@ -127,6 +126,7 @@ export default function NfcToolFeature() {
 
   const displayTabDetail = () => {
     selectTab("detail");
+    setCardPresent(true);
 
     setOutput(getDetail());
   };
@@ -172,18 +172,20 @@ export default function NfcToolFeature() {
           </Button>
         </div>
 
-        <FormControl fullWidth>
-          <TextField
-            label="Output"
-            multiline
-            rows={9}
-            value={output}
-            readOnly
-            helperText={command}
-          />
+        {cardPresent ? (
+          <FormControl fullWidth>
+            <TextField
+              label="Output"
+              multiline
+              rows={9}
+              value={output}
+              readOnly
+              helperText={command}
+            />
 
-          <p>{status}</p>
-        </FormControl>
+            <p>{status}</p>
+          </FormControl>
+        ) : null}
       </Box>
     </>
   );
