@@ -1,0 +1,7 @@
+{
+    "description": "nfc tool to read /write nfc device",
+    "section": {
+        "path": "devices"
+    },
+    "path": "nfcTool"
+}
