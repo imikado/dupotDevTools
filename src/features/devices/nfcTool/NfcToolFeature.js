@@ -16,6 +16,7 @@ import SystemApi from "../../../apis/SystemApi";
 
 import Settings from "./Settings";
 import card from "./card.json";
+import { json } from "react-router-dom";
 
 const datetimeApi = new DatetimeApi();
 const systemApi = new SystemApi();
@@ -57,15 +58,11 @@ export default function NfcToolFeature() {
 
   const getUid = () => {
     let outputCommand = getCommandOutput("getuid");
-    if (outputCommand.includes("getuid")) {
-      let outputCommandList = outputCommand.split("\n");
-      for (let key in outputCommandList) {
-        let lineLoop = outputCommandList[key];
-        if (lineLoop.includes("getuid")) {
-          return lineLoop;
-        }
-      }
+    let jsonObj = JSON.parse(outputCommand);
+    if (jsonObj) {
+      return jsonObj.getuid;
     }
+
     return "";
   };
 
@@ -74,37 +71,15 @@ export default function NfcToolFeature() {
   };
 
   const getDetail = () => {
-    let outputCommand = "";
-    for (let i = 0; i < 16; i++) {
-      outputCommand += extractBlockTextFromOutput(
-        getCommandOutput("read " + i)
-      );
+    let outputCommand = getCommandOutput("read");
+
+    //return outputCommand;
+
+    let jsonObj = JSON.parse(outputCommand);
+    if (jsonObj) {
+      return systemApi.base64Decode(jsonObj.data);
     }
-    return decode_utf8(outputCommand);
   };
-
-  const extractBlockTextFromOutput = (outputCommandToExtract) => {
-    let extractText = "";
-
-    let extractBlockTextFromOutputList = outputCommandToExtract.split("\n");
-    for (let keyLoop in extractBlockTextFromOutputList) {
-      let lineLoop = extractBlockTextFromOutputList[keyLoop];
-      if (lineLoop.substr(0, 5) == "block") {
-        let detailLineList = lineLoop.split("|");
-
-        extractText += detailLineList[1].trim();
-      }
-    }
-    return extractText;
-  };
-
-  function encode_utf8(s) {
-    return decoder.encode(s);
-  }
-
-  function decode_utf8(s) {
-    return unescape(s);
-  }
 
   const hasInfo = () => {
     let uid = getUid();
