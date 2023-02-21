@@ -67,7 +67,7 @@ export default function NfcToolFeature() {
   };
 
   const getInfo = () => {
-    return getCommandOutput("info");
+    return JSON.stringify(JSON.parse(getCommandOutput("info")), null, 4);
   };
 
   const getDetail = () => {
