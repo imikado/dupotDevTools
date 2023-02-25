@@ -77,7 +77,7 @@ export default function NfcToolFeature() {
 
     let jsonObj = JSON.parse(outputCommand);
     if (jsonObj) {
-      return systemApi.base64Decode(jsonObj.data);
+      return jsonObj.data;
     }
   };
 
