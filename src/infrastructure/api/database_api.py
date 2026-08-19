@@ -70,6 +70,23 @@ class DatabaseApi:
     def is_connected(self) -> bool:
         return self._conn is not None
 
+    @property
+    def kind(self) -> str | None:
+        return self._kind
+
+    def execute(self, sql: str) -> tuple[list[str], list[tuple]]:
+        """Runs a SELECT and returns (column_names, rows)."""
+        if not self._conn:
+            raise DatabaseConnectionError("Not connected.")
+        cur = self._conn.cursor()
+        try:
+            cur.execute(sql)
+            columns = [d[0] for d in cur.description] if cur.description else []
+            rows = cur.fetchall() if cur.description else []
+            return columns, rows
+        finally:
+            cur.close()
+
     def list_tables(self) -> list[str]:
         if not self._conn:
             return []
