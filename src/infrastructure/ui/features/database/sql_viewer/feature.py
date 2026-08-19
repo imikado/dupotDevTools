@@ -1,3 +1,4 @@
+import csv
 import datetime
 
 import gi
@@ -27,6 +28,8 @@ class Feature(FeatureContract):
         table_cards = []  # [{"table", "frame", "columns": {name: {"check","anchor"}}}]
         joins = []  # [{"left": {...}, "right": {...}}]
         pending_link = [None]  # anchor waiting for its counterpart, or None
+
+        last_query_result = {"columns": [], "rows": []}
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
 
@@ -235,18 +238,57 @@ class Feature(FeatureContract):
         refresh_joins_panel()
 
         # --- Query execution ---
+        sql_editor_lbl = Gtk.Label(label="SQL query", xalign=0)
+        sql_editor_lbl.add_css_class("heading")
+
+        sql_editor_hint = Gtk.Label(
+            label="Built from the canvas — edit freely to add a WHERE, GROUP BY, "
+            "ORDER BY…, then Run Query.",
+            xalign=0,
+        )
+        sql_editor_hint.add_css_class("dim-label")
+        sql_editor_hint.add_css_class("caption")
+        sql_editor_hint.set_wrap(True)
+
+        sql_buffer = Gtk.TextBuffer()
+        sql_view = Gtk.TextView(buffer=sql_buffer)
+        sql_view.add_css_class("monospace")
+        sql_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        sql_view.set_top_margin(8)
+        sql_view.set_bottom_margin(8)
+        sql_view.set_left_margin(8)
+        sql_view.set_right_margin(8)
+
+        sql_scroll = Gtk.ScrolledWindow()
+        sql_scroll.add_css_class("card")
+        sql_scroll.set_min_content_height(110)
+        sql_scroll.set_max_content_height(260)
+        sql_scroll.set_propagate_natural_height(True)
+        sql_scroll.set_hexpand(True)
+        sql_scroll.set_child(sql_view)
+
+        def get_sql_text():
+            start, end = sql_buffer.get_bounds()
+            return sql_buffer.get_text(start, end, True)
+
+        generate_sql_btn = Gtk.Button(label="Generate from canvas")
         run_btn = Gtk.Button(label="Run Query")
         run_btn.add_css_class("suggested-action")
-        run_btn.set_halign(Gtk.Align.START)
 
-        sql_lbl = Gtk.Label(label="", xalign=0)
-        sql_lbl.add_css_class("dim-label")
-        sql_lbl.add_css_class("caption")
-        sql_lbl.set_wrap(True)
-        sql_lbl.set_selectable(True)
+        sql_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        sql_actions.append(generate_sql_btn)
+        sql_actions.append(run_btn)
 
         results_lbl = Gtk.Label(label="Results", xalign=0)
         results_lbl.add_css_class("heading")
+        results_lbl.set_hexpand(True)
+
+        export_csv_btn = Gtk.Button(label="Export CSV…")
+        export_csv_btn.set_sensitive(False)
+
+        results_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        results_header.append(results_lbl)
+        results_header.append(export_csv_btn)
 
         results_scroll = Gtk.ScrolledWindow()
         results_scroll.add_css_class("card")
@@ -324,11 +366,7 @@ class Feature(FeatureContract):
             sql += f" LIMIT {_MAX_RESULT_ROWS}"
             return sql, None
 
-        def render_results(columns, rows):
-            if not columns:
-                results_scroll.set_child(make_results_placeholder("Query executed — no rows."))
-                return
-
+        def render_grid(columns, rows):
             grid = Gtk.Grid()
             grid.set_row_spacing(1)
             grid.set_column_spacing(1)
@@ -357,12 +395,65 @@ class Feature(FeatureContract):
 
             results_scroll.set_child(grid)
 
-        def do_run_query(_btn):
+        def render_results(columns, rows):
+            last_query_result["columns"] = columns
+            last_query_result["rows"] = rows
+            export_csv_btn.set_sensitive(bool(columns))
+            if not columns:
+                results_scroll.set_child(make_results_placeholder("Query executed — no rows."))
+                return
+            render_grid(columns, rows)
+
+        def do_export_csv(_btn):
+            columns = last_query_result["columns"]
+            rows = last_query_result["rows"]
+            if not columns:
+                set_error("Run a query first.")
+                return
+
+            file_dialog = Gtk.FileDialog()
+            file_dialog.set_initial_name("query_results.csv")
+
+            def on_save(d, result):
+                try:
+                    gfile = d.save_finish(result)
+                except GLib.Error:
+                    return
+                path = gfile.get_path()
+                try:
+                    with open(path, "w", newline="", encoding="utf-8") as fh:
+                        writer = csv.writer(fh)
+                        writer.writerow(columns)
+                        for row in rows:
+                            writer.writerow(["" if v is None else v for v in row])
+                except OSError as e:
+                    set_error(str(e))
+                    return
+                set_status(f"Exported {len(rows)} row(s) to {path}")
+
+            file_dialog.save(export_csv_btn.get_root(), None, on_save)
+
+        export_csv_btn.connect("clicked", do_export_csv)
+
+        def do_generate_sql(_btn):
             sql, err = build_query()
             if err:
                 set_error(err)
                 return
-            sql_lbl.set_text(sql)
+            sql_buffer.set_text(sql)
+            set_status("SQL generated from the canvas — edit it, then Run Query.")
+
+        generate_sql_btn.connect("clicked", do_generate_sql)
+
+        def do_run_query(_btn):
+            sql = get_sql_text().strip()
+            if not sql:
+                # Nothing typed yet — build it from the canvas as a convenience.
+                sql, err = build_query()
+                if err:
+                    set_error(err)
+                    return
+                sql_buffer.set_text(sql)
             try:
                 columns, rows = db.execute(sql)
             except Exception as e:
@@ -844,8 +935,10 @@ class Feature(FeatureContract):
         root.append(canvas_panel)
         root.append(joins_lbl)
         root.append(joins_box)
-        root.append(run_btn)
-        root.append(sql_lbl)
-        root.append(results_lbl)
+        root.append(sql_editor_lbl)
+        root.append(sql_editor_hint)
+        root.append(sql_scroll)
+        root.append(sql_actions)
+        root.append(results_header)
         root.append(results_scroll)
         return root
