@@ -1,7 +1,0 @@
-{
-    "description": "encode/decode text from/to URL",
-    "section": {
-        "path": "encoding"
-    },
-    "path": "urlEncoding"
-}

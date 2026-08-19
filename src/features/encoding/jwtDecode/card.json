@@ -1,7 +1,0 @@
-{
-    "description": "Decode JWT token",
-    "section": {
-        "path": "encoding"
-    },
-    "path": "jwtDecode"
-}

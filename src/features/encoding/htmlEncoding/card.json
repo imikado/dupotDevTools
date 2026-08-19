@@ -1,7 +1,0 @@
-{
-    "description": "encode/decode text from/to HTML",
-    "section": {
-        "path": "encoding"
-    },
-    "path": "htmlEncoding"
-}

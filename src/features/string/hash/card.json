@@ -1,7 +1,0 @@
-{
-    "description": "convert your string to different hash",
-    "section": {
-        "path": "string"
-    },
-    "path": "hash"
-}

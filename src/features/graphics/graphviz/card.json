@@ -1,7 +1,0 @@
-{
-    "description": "use graphviz to generate schema",
-    "section": {
-        "path": "graphics"
-    },
-    "path": "graphviz"
-}
