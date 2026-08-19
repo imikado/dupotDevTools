@@ -68,7 +68,8 @@ class Feature(FeatureContract):
 
         canvas_hint = Gtk.Label(
             label="Right-click the canvas to add a connected table. "
-            "Click the link icon on two columns to join them.",
+            "Click the link icon on two columns to join them. "
+            "Click a join line to change its columns.",
             xalign=0,
         )
         canvas_hint.add_css_class("dim-label")
@@ -82,31 +83,69 @@ class Feature(FeatureContract):
         link_lines = Gtk.DrawingArea()
         link_lines.set_can_target(False)
 
+        link_hitboxes = []  # [(join, p0, c1, c2, p3)], rebuilt on every draw for click hit-testing
+
+        def edge_point(anchor, frame, facing_frame):
+            # Connects at the vertical height of the linked column, but always on the
+            # frame edge that faces the other table — so the line hugs the outside of
+            # both cards instead of cutting across whichever one sits in between.
+            a = anchor.translate_coordinates(
+                link_lines, anchor.get_width() / 2, anchor.get_height() / 2
+            )
+            f = frame.translate_coordinates(link_lines, 0, 0)
+            ff = facing_frame.translate_coordinates(link_lines, 0, 0)
+            if a is None or f is None or ff is None:
+                return None
+            _, ay = a
+            fx, _ = f
+            ffx, _ = ff
+            own_center = fx + frame.get_width() / 2
+            facing_center = ffx + facing_frame.get_width() / 2
+            edge_x = fx + frame.get_width() if own_center <= facing_center else fx
+            return edge_x, ay
+
         def draw_links(_area, cr, _width, _height, _data=None):
             r, g, b = _LINK_COLOR
+            link_hitboxes.clear()
             for join in joins:
                 left_anchor = join["left"]["anchor"]
                 right_anchor = join["right"]["anchor"]
-                p1 = left_anchor.translate_coordinates(
-                    link_lines, left_anchor.get_width() / 2, left_anchor.get_height() / 2
-                )
-                p2 = right_anchor.translate_coordinates(
-                    link_lines, right_anchor.get_width() / 2, right_anchor.get_height() / 2
-                )
+                p1 = edge_point(left_anchor, join["left"]["card"]["frame"], join["right"]["card"]["frame"])
+                p2 = edge_point(right_anchor, join["right"]["card"]["frame"], join["left"]["card"]["frame"])
                 if p1 is None or p2 is None:
                     continue
                 x1, y1 = p1
                 x2, y2 = p2
+                c1 = ((x1 + x2) / 2, y1)
+                c2 = ((x1 + x2) / 2, y2)
                 cr.set_source_rgba(r, g, b, 0.9)
                 cr.set_line_width(2)
                 cr.move_to(x1, y1)
-                cr.curve_to((x1 + x2) / 2, y1, (x1 + x2) / 2, y2, x2, y2)
+                cr.curve_to(c1[0], c1[1], c2[0], c2[1], x2, y2)
                 cr.stroke()
                 for px, py in ((x1, y1), (x2, y2)):
                     cr.arc(px, py, 3.5, 0, 2 * 3.14159)
                     cr.fill()
+                link_hitboxes.append((join, (x1, y1), c1, c2, (x2, y2)))
 
         link_lines.set_draw_func(draw_links)
+
+        def bezier_point(p0, c1, c2, p3, t):
+            mt = 1 - t
+            x = (mt**3) * p0[0] + 3 * (mt**2) * t * c1[0] + 3 * mt * (t**2) * c2[0] + (t**3) * p3[0]
+            y = (mt**3) * p0[1] + 3 * (mt**2) * t * c1[1] + 3 * mt * (t**2) * c2[1] + (t**3) * p3[1]
+            return x, y
+
+        def find_join_at(x, y, tolerance=7):
+            best_join, best_dist = None, tolerance
+            for join, p0, c1, c2, p3 in link_hitboxes:
+                for i in range(21):
+                    px, py = bezier_point(p0, c1, c2, p3, i / 20)
+                    dist = ((px - x) ** 2 + (py - y) ** 2) ** 0.5
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_join = join
+            return best_join
 
         canvas_overlay = Gtk.Overlay()
         canvas_overlay.set_child(fixed)
@@ -407,6 +446,7 @@ class Feature(FeatureContract):
             header.set_cursor(Gdk.Cursor.new_from_name("move"))
 
             fields_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            fields_box.set_margin_end(10)
             if columns:
                 for col_name, col_type in columns:
                     label = f"{col_name}  ·  {col_type}" if col_type else col_name
@@ -440,6 +480,7 @@ class Feature(FeatureContract):
             fields_scroll.set_max_content_height(220)
             fields_scroll.set_propagate_natural_height(len(columns) <= 8)
             fields_scroll.set_vexpand(True)
+            fields_scroll.set_overlay_scrolling(False)
             fields_scroll.set_child(fields_box)
 
             vbox.append(header)
@@ -572,6 +613,91 @@ class Feature(FeatureContract):
         right_click = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
         right_click.connect("pressed", on_canvas_right_click)
         fixed.add_controller(right_click)
+
+        # --- Join editor (click a join line to change its columns) ---
+        def show_join_editor(join, x, y):
+            left_side, right_side = join["left"], join["right"]
+            left_card, right_card = left_side["card"], right_side["card"]
+            left_cols = list(left_card["columns"].keys())
+            right_cols = list(right_card["columns"].keys())
+
+            popover = Gtk.Popover()
+            popover.set_parent(fixed)
+            rect = Gdk.Rectangle()
+            rect.x, rect.y, rect.width, rect.height = int(x), int(y), 1, 1
+            popover.set_pointing_to(rect)
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            box.set_margin_top(10)
+            box.set_margin_bottom(10)
+            box.set_margin_start(10)
+            box.set_margin_end(10)
+
+            title_lbl = Gtk.Label(label="Edit join", xalign=0)
+            title_lbl.add_css_class("heading")
+            box.append(title_lbl)
+
+            left_lbl = Gtk.Label(label=left_card["table"], xalign=0)
+            left_lbl.add_css_class("dim-label")
+            left_lbl.add_css_class("caption")
+            left_dropdown = Gtk.DropDown(model=Gtk.StringList.new(left_cols))
+            left_dropdown.set_selected(left_cols.index(left_side["col"]))
+            box.append(left_lbl)
+            box.append(left_dropdown)
+
+            right_lbl = Gtk.Label(label=right_card["table"], xalign=0)
+            right_lbl.add_css_class("dim-label")
+            right_lbl.add_css_class("caption")
+            right_dropdown = Gtk.DropDown(model=Gtk.StringList.new(right_cols))
+            right_dropdown.set_selected(right_cols.index(right_side["col"]))
+            box.append(right_lbl)
+            box.append(right_dropdown)
+
+            btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            btn_row.set_margin_top(4)
+            remove_btn = Gtk.Button(label="Remove join")
+            remove_btn.add_css_class("destructive-action")
+            remove_btn.set_hexpand(True)
+            apply_btn = Gtk.Button(label="Apply")
+            apply_btn.add_css_class("suggested-action")
+            apply_btn.set_hexpand(True)
+            btn_row.append(remove_btn)
+            btn_row.append(apply_btn)
+            box.append(btn_row)
+
+            popover.set_child(box)
+
+            def do_remove(_b):
+                popover.popdown()
+                remove_join(join)
+
+            def do_apply(_b):
+                new_left_col = left_cols[left_dropdown.get_selected()]
+                new_right_col = right_cols[right_dropdown.get_selected()]
+                popover.popdown()
+                if new_left_col == left_side["col"] and new_right_col == right_side["col"]:
+                    return
+                new_left_anchor = left_card["columns"][new_left_col]["anchor"]
+                new_right_anchor = right_card["columns"][new_right_col]["anchor"]
+                remove_join(join)
+                new_left_anchor.set_active(True)
+                new_right_anchor.set_active(True)
+
+            remove_btn.connect("clicked", do_remove)
+            apply_btn.connect("clicked", do_apply)
+            popover.connect("closed", lambda p: p.unparent())
+            popover.popup()
+
+        def on_canvas_left_click(gesture, _n_press, x, y):
+            join = find_join_at(x, y)
+            if join is None:
+                return
+            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+            show_join_editor(join, x, y)
+
+        left_click = Gtk.GestureClick(button=Gdk.BUTTON_PRIMARY)
+        left_click.connect("pressed", on_canvas_left_click)
+        fixed.add_controller(left_click)
 
         # --- New connection dialog ---
         def open_new_connection_dialog(_btn):
