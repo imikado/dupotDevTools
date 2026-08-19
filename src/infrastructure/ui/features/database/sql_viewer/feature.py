@@ -354,7 +354,7 @@ class Feature(FeatureContract):
 
             frame = Gtk.Frame()
             frame.add_css_class("card")
-            frame.set_size_request(240, -1)
+            frame.set_size_request(240, 160)
             card_info["frame"] = frame
 
             vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -405,18 +405,30 @@ class Feature(FeatureContract):
                 empty_lbl.add_css_class("dim-label")
                 fields_box.append(empty_lbl)
 
+            fields_scroll = Gtk.ScrolledWindow()
+            fields_scroll.set_max_content_height(220)
+            fields_scroll.set_propagate_natural_height(len(columns) <= 8)
+            fields_scroll.set_vexpand(True)
+            fields_scroll.set_child(fields_box)
+
             vbox.append(header)
             vbox.append(Gtk.Separator())
-            if len(columns) > 8:
-                fields_scroll = Gtk.ScrolledWindow()
-                fields_scroll.set_max_content_height(220)
-                fields_scroll.set_propagate_natural_height(True)
-                fields_scroll.set_child(fields_box)
-                vbox.append(fields_scroll)
-            else:
-                vbox.append(fields_box)
+            vbox.append(fields_scroll)
 
-            frame.set_child(vbox)
+            card_overlay = Gtk.Overlay()
+            card_overlay.set_child(vbox)
+
+            resize_handle = Gtk.Label(label="⤡")
+            resize_handle.add_css_class("dim-label")
+            resize_handle.set_halign(Gtk.Align.END)
+            resize_handle.set_valign(Gtk.Align.END)
+            resize_handle.set_margin_end(3)
+            resize_handle.set_margin_bottom(2)
+            resize_handle.set_cursor(Gdk.Cursor.new_from_name("se-resize"))
+            resize_handle.set_tooltip_text("Drag to resize this table")
+            card_overlay.add_overlay(resize_handle)
+
+            frame.set_child(card_overlay)
 
             def on_close(_b):
                 fixed.remove(frame)
@@ -448,6 +460,23 @@ class Feature(FeatureContract):
             drag.connect("drag-begin", on_drag_begin)
             drag.connect("drag-update", on_drag_update)
             header.add_controller(drag)
+
+            resize_start = [0.0, 0.0]
+            resize_drag = Gtk.GestureDrag()
+
+            def on_resize_begin(_g, _x, _y):
+                resize_start[0] = frame.get_width()
+                resize_start[1] = frame.get_height()
+
+            def on_resize_update(_g, dx, dy):
+                new_w = max(200, resize_start[0] + dx)
+                new_h = max(120, resize_start[1] + dy)
+                frame.set_size_request(int(new_w), int(new_h))
+                link_lines.queue_draw()
+
+            resize_drag.connect("drag-begin", on_resize_begin)
+            resize_drag.connect("drag-update", on_resize_update)
+            resize_handle.add_controller(resize_drag)
 
             return card_info
 
@@ -491,6 +520,9 @@ class Feature(FeatureContract):
             list_scroll = Gtk.ScrolledWindow()
             list_scroll.set_max_content_height(240)
             list_scroll.set_propagate_natural_height(True)
+            list_scroll.set_min_content_width(220)
+            list_scroll.set_max_content_width(480)
+            list_scroll.set_propagate_natural_width(True)
             list_scroll.set_child(listbox)
             popover.set_child(list_scroll)
             popover.connect("closed", lambda p: p.unparent())
