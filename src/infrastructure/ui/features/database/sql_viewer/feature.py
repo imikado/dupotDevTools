@@ -17,6 +17,8 @@ _LINK_COLOR = (0.22, 0.51, 0.89)
 
 
 class Feature(FeatureContract):
+    FULL_WIDTH = True
+
     def get_widget(self):
         db = DatabaseApi()
         connections = []  # [{"name", "kind", "params"}, ...], mirrors conn_model
@@ -112,10 +114,39 @@ class Feature(FeatureContract):
 
         canvas_scroll = Gtk.ScrolledWindow()
         canvas_scroll.add_css_class("card")
-        canvas_scroll.set_min_content_height(420)
+        canvas_scroll.set_size_request(-1, 420)
         canvas_scroll.set_vexpand(True)
         canvas_scroll.set_hexpand(True)
         canvas_scroll.set_child(canvas_overlay)
+
+        canvas_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        canvas_panel.append(canvas_scroll)
+
+        canvas_resize_handle = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        canvas_resize_handle.set_size_request(-1, 10)
+        canvas_resize_handle.set_halign(Gtk.Align.FILL)
+        canvas_resize_handle.add_css_class("dim-label")
+        canvas_resize_handle.set_cursor(Gdk.Cursor.new_from_name("ns-resize"))
+        canvas_resize_handle.set_tooltip_text("Drag to resize the canvas")
+        grip_lbl = Gtk.Label(label="⋯")
+        grip_lbl.set_hexpand(True)
+        grip_lbl.add_css_class("dim-label")
+        canvas_resize_handle.append(grip_lbl)
+        canvas_panel.append(canvas_resize_handle)
+
+        canvas_resize_start = [0]
+        canvas_resize_drag = Gtk.GestureDrag()
+
+        def on_canvas_resize_begin(_g, _x, _y):
+            canvas_resize_start[0] = canvas_scroll.get_height()
+
+        def on_canvas_resize_update(_g, _dx, dy):
+            new_h = max(240, canvas_resize_start[0] + dy)
+            canvas_scroll.set_size_request(-1, int(new_h))
+
+        canvas_resize_drag.connect("drag-begin", on_canvas_resize_begin)
+        canvas_resize_drag.connect("drag-update", on_canvas_resize_update)
+        canvas_resize_handle.add_controller(canvas_resize_drag)
 
         # --- Joins panel ---
         joins_lbl = Gtk.Label(label="Joins", xalign=0)
@@ -684,7 +715,7 @@ class Feature(FeatureContract):
         root.append(status_lbl)
         root.append(canvas_lbl)
         root.append(canvas_hint)
-        root.append(canvas_scroll)
+        root.append(canvas_panel)
         root.append(joins_lbl)
         root.append(joins_box)
         root.append(run_btn)
