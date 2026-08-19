@@ -72,6 +72,7 @@ def _recolor_pixbuf(pixbuf, rgb_hex):
 
 _SECTION_ICONS = {
     "convert": "media-playlist-shuffle-symbolic",
+    "database": "network-server-symbolic",
     "encoding": "security-high-symbolic",
     "formating": "format-justify-fill-symbolic",
     "graphics": "image-x-generic-symbolic",
