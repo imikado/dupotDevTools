@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Dupot app icon template (orange corner + "d" + gradient circle, cf. the
+     other dupot apps) with the Dev Tools pictogram: "< / >" where the slash
+     is a wrench. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 148.09265 148.21524">
+  <defs>
+    <linearGradient id="circle" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d6e1f5"/>
+    </linearGradient>
+    <mask id="jaw" maskUnits="userSpaceOnUse" x="-30" y="-60" width="60" height="140">
+      <rect x="-30" y="-60" width="60" height="140" fill="#fff"/>
+      <rect x="-6.5" y="-50" width="13" height="26" rx="2" fill="#000"/>
+    </mask>
+  </defs>
+
+  <rect x="64.941448" y="0" width="83.151207" height="83.151207" rx="8.9396687" fill="#ee5f00"/>
+  <circle cx="74.04" cy="74.11" r="74.05" fill="url(#circle)"/>
+  <text x="128.14534" y="24.775015" fill="#ffffff"
+        font-family="Ubuntu, 'DejaVu Sans', sans-serif" font-weight="bold" font-size="25.4px">d</text>
+
+  <g fill="none" stroke="#204a87" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="44,50 22,74 44,98"/>
+    <polyline points="104,50 126,74 104,98"/>
+  </g>
+
+  <g transform="translate(74 72) rotate(28)" fill="#ee5f00">
+    <g mask="url(#jaw)">
+      <circle cx="0" cy="-24" r="16"/>
+    </g>
+    <rect x="-6.5" y="-14" width="13" height="56" rx="6.5"/>
+  </g>
+</svg>

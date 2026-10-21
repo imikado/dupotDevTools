@@ -1,16 +1,16 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // Requires the CodeLLDB extension; open VSCode from `nix develop` so
+    // cargo and the GTK libraries are on the environment.
     "version": "0.2.0",
     "configurations": [
         {
             "name": "dupotDevTools",
+            "type": "lldb",
             "request": "launch",
-            "type": "debugpy",
-            "program": "${workspaceFolder}/src/main.py",
-            "cwd": "${workspaceFolder}/src",
-            "envFile": "${workspaceFolder}/.env"
+            "cargo": {
+                "args": ["build", "--bin=dupot-dev-tools"]
+            },
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

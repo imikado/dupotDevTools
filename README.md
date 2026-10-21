@@ -9,7 +9,7 @@
 Format, convert, encode, decode, hash… and explore your SQL databases visually.
 All in one native, fast, offline GTK4 / Libadwaita application.
 
-![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-2024-DEA584?logo=rust&logoColor=white)
 ![GTK4](https://img.shields.io/badge/GTK-4-4A86CF?logo=gtk&logoColor=white)
 ![Libadwaita](https://img.shields.io/badge/Libadwaita-1-3584E4)
 ![License](https://img.shields.io/badge/License-LGPL--2.1-green)
@@ -27,7 +27,7 @@ How many times a day do you paste a JWT, a JSON blob or a SQL query into a rando
 Dupot Dev Tools gathers all those small everyday utilities in **one desktop app**:
 
 - 🔒 **100% local** — your tokens, data and queries never leave your machine
-- ⚡ **Native and lightweight** — Python + GTK4, no Electron, no browser
+- ⚡ **Native and lightweight** — Rust + GTK4, no Electron, no browser
 - 🎨 **Fits your desktop** — Libadwaita UI, light and dark themes
 - 🧩 **Modular** — each tool is a self-contained folder; adding one takes minutes
 
@@ -66,61 +66,66 @@ A visual query builder that lets you understand a database at a glance:
 ### Debian / Ubuntu / Linux Mint
 
 ```bash
-sudo apt install python3 python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gtksource-5 \
-                 python3-yaml python3-sqlparse python3-html2text
+sudo apt install cargo pkg-config libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev
 git clone https://github.com/imikado/dupotDevTools.git
 cd dupotDevTools
-python3 src/main.py
+cargo run --release
 ```
 
-Optional, for the SQL Viewer:
-
-```bash
-sudo apt install python3-psycopg2 python3-pymysql   # PostgreSQL / MySQL
-```
+SQLite, PostgreSQL and MySQL drivers are built in — no extra packages needed.
 
 ### Nix
 
 ```bash
-nix develop
-python3 src/main.py
+nix run            # build and launch
+nix develop        # dev shell with cargo, clippy, rust-analyzer
+cargo run
+```
+
+## 📦 Packaging
+
+```bash
+./build_flatpak.sh                  # -> org.dupot.devtools.flatpak (GNOME 50 runtime)
+./build_windows.sh                  # in an MSYS2 UCRT64 shell -> export/windows/*.zip
 ```
 
 ## 🧩 Add your own tool
 
-Each tool lives in its own folder under `src/infrastructure/ui/features/<category>/<tool>/` and is discovered automatically at startup:
+Each tool lives in its own folder under `src/infrastructure/ui/features/<category>/<tool>/`:
 
 ```
 features/
 └── string/
     └── hash/
-        ├── card.json    # description + icon shown on the home page
-        ├── feature.py   # the tool's UI
-        └── icon.png
+        ├── mod.rs     # description + the tool's UI
+        └── icon.png   # shown on the home page
 ```
 
-`card.json`:
+`mod.rs`:
 
-```json
-{
-    "description": "Generate cryptographic hash digests",
-    "icon_name": "security-high-symbolic"
+```rust
+use gtk::prelude::*;
+
+use crate::domain::contract::FeatureContract;
+
+pub const DESCRIPTION: &str = "Generate cryptographic hash digests";
+
+pub struct Feature;
+
+impl FeatureContract for Feature {
+    fn widget(&self) -> gtk::Widget {
+        gtk::Label::new(Some("Hello from my new tool!")).upcast()
+    }
 }
 ```
 
-`feature.py`:
+Then declare the module in the category's `mod.rs` (`pub mod hash;`) and add one line to `registry()` in `features/mod.rs`:
 
-```python
-from gi.repository import Gtk
-from domain.contract.feature_contract import FeatureContract
-
-
-class Feature(FeatureContract):
-    def get_widget(self):
-        return Gtk.Label(label="Hello from my new tool!")
+```rust
+feature!(string::hash),
 ```
 
-A new folder = a new category. No registration, no configuration.
+A new category folder = a new sidebar section.
 
 ## 🤝 Contributing
 

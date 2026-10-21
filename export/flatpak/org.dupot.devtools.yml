@@ -1,0 +1,52 @@
+app-id: org.dupot.devtools
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: dupot-dev-tools
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  # PostgreSQL / MySQL servers for the SQL Viewer
+  - --share=network
+  # SQLite database files opened by path (FileDialog goes through the portal)
+  - --filesystem=home
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/dupot-dev-tools/cargo
+
+modules:
+  - name: dupot-dev-tools
+    buildsystem: simple
+    build-options:
+      # Local bundle only: lets cargo download crates during the build.
+      # A Flathub submission must instead ship generated cargo-sources.json
+      # (flatpak-builder-tools/cargo) and build with --offline.
+      build-args:
+        - --share=network
+    build-commands:
+      - cargo build --release --locked
+      - install -Dm755 target/release/dupot-dev-tools -t /app/bin/
+      - install -Dm644 export/flatpak/org.dupot.devtools.desktop -t /app/share/applications/
+      - install -Dm644 export/flatpak/org.dupot.devtools.appdata.xml -t /app/share/metainfo/
+      - |
+        for size in 16 24 32 48 64 128 256 512; do
+          install -Dm644 export/flatpak/${size}x${size}.png \
+            /app/share/icons/hicolor/${size}x${size}/apps/org.dupot.devtools.png
+        done
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - target
+          - result
+          - build-dir
+          - build-windows
+          - repo
+          - .flatpak-builder
+          - .git

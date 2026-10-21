@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.dupot.devtools</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LGPL-2.1-only</project_license>
+  <name>Dupot Dev Tools</name>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#96aff8</color>
+    <color type="primary" scheme_preference="dark">#122355</color>
+  </branding>
+
+  <launchable type="desktop-id">org.dupot.devtools.desktop</launchable>
+
+  <developer id="michael.bertocchi">
+    <name>Michael Bertocchi</name>
+  </developer>
+
+  <summary>The developer's Swiss Army knife</summary>
+  <summary xml:lang="fr">Le couteau suisse du développeur</summary>
+
+  <description>
+    <p>Format, convert, encode, decode and hash data, and explore SQLite, PostgreSQL and MySQL databases visually. Everything runs locally.</p>
+  </description>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/imikado/dupotDevTools/refs/heads/main/export/screenshots/sqlviewer_joins.png</image>
+      <caption>SQL Viewer: tables and joins on the canvas</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/imikado/dupotDevTools/refs/heads/main/export/screenshots/sqlviewer_request.png</image>
+      <caption>SQL Viewer: query results</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/imikado/dupotDevTools/refs/heads/main/export/screenshots/database_section.png</image>
+      <caption>Database section</caption>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://www.dupot.org</url>
+  <url type="vcs-browser">https://github.com/imikado/dupotDevTools/</url>
+  <update_contact>imikado@gmail.com</update_contact>
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+
+    <release date="2026-08-24" version="1.0.0">
+      <description>
+        <ul>
+          <li>New version</li>
+        </ul>
+      </description>
+    </release>
+
+  </releases>
+</component>

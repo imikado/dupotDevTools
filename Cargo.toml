@@ -1,0 +1,37 @@
+[package]
+name = "dupot-dev-tools"
+version = "1.0.0"
+edition = "2024"
+description = "The developer's Swiss Army knife for the Linux desktop"
+license = "LGPL-2.1-only"
+authors = ["Michael Bertocchi"]
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
+sourceview5 = "0.11"
+serde = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml_ng = "0.10"
+base64 = "0.23"
+percent-encoding = "2"
+html-escape = "0.3"
+html2text = "0.17"
+sqlformat = "0.5"
+quick-xml = "0.42"
+md-5 = "0.11"
+sha1 = "0.11"
+sha2 = "0.11"
+sha3 = "0.12"
+blake2 = "0.11"
+csv = "1"
+rusqlite = { version = "0.40", features = ["bundled"] }
+postgres = "0.19"
+mysql = { version = "28", default-features = false, features = ["minimal-rust"] }
+
+[profile.release]
+lto = true
+strip = true
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"

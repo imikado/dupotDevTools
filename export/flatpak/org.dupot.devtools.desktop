@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Dupot Dev Tools
+Comment=The developer's Swiss Army knife
+Comment[fr]=Le couteau suisse du développeur
+Exec=dupot-dev-tools
+Icon=org.dupot.devtools
+Type=Application
+Categories=Development;Utility;
+Keywords=json;yaml;base64;jwt;sql;hash;xml;
+Terminal=false

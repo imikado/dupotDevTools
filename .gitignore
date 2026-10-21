@@ -1,6 +1,10 @@
 # testing
 /coverage
 
+# Rust
+/target
+/result
+
 # production
 /build
 /out
@@ -40,3 +44,9 @@ make.sh
 help.txt
 flatpak/org.dupot.dupot-dev-tools.yml
 */*__pycache__
+
+# packaging
+/build-dir
+/repo
+/build-windows
+*.flatpak
