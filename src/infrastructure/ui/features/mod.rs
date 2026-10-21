@@ -13,6 +13,7 @@ macro_rules! feature {
     ($section:ident :: $name:ident) => {
         FeatureEntity {
             name: stringify!($name),
+            title: $section::$name::TITLE,
             description: $section::$name::DESCRIPTION,
             section: stringify!($section),
             icon: Some(include_bytes!(concat!(

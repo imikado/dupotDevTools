@@ -2,6 +2,7 @@ use crate::domain::contract::FeatureContract;
 use crate::infrastructure::ui::shared::input_output_widget::{InputOutputWidget, Options};
 use crate::infrastructure::ui::shared::json::to_pretty_json;
 
+pub const TITLE: &str = "YAML ↔ JSON";
 pub const DESCRIPTION: &str = "Convert YAML ↔ JSON";
 
 pub struct Feature;
@@ -26,12 +27,12 @@ impl FeatureContract for Feature {
         tool.add_button("YAML → JSON", |t| {
             t.set_input_language(Some("yaml"));
             t.set_output_language(Some("json"));
-            t.report("Converted", yaml_to_json(&t.input()));
+            t.report(yaml_to_json(&t.input()));
         });
         tool.add_button_with_class("JSON → YAML", None, |t| {
             t.set_input_language(Some("json"));
             t.set_output_language(Some("yaml"));
-            t.report("Converted", json_to_yaml(&t.input()));
+            t.report(json_to_yaml(&t.input()));
         });
         tool.into_widget()
     }

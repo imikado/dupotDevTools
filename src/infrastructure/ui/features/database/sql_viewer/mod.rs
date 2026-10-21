@@ -9,6 +9,7 @@ use crate::domain::contract::FeatureContract;
 use crate::infrastructure::api::database_api::{self, ConnectionParams, DatabaseApi, DbKind};
 use crate::infrastructure::ui::shared::input_output_widget::timestamp;
 
+pub const TITLE: &str = "SQL Viewer";
 pub const DESCRIPTION: &str = "Browse database tables on an interactive canvas";
 
 const MAX_RESULT_ROWS: usize = 200;
@@ -76,9 +77,11 @@ struct SqlViewer {
 
     conn_model: gtk::StringList,
     conn_dropdown: gtk::DropDown,
+    connect_btn: gtk::Button,
     new_conn_btn: gtk::Button,
     status_lbl: gtk::Label,
     fixed: gtk::Fixed,
+    canvas_placeholder: gtk::Box,
     link_lines: gtk::DrawingArea,
     joins_box: gtk::Box,
     sql_buffer: gtk::TextBuffer,
@@ -187,6 +190,8 @@ impl SqlViewer {
         let new_conn_btn = gtk::Button::with_label("New Connection…");
         let connect_btn = gtk::Button::with_label("Connect");
         connect_btn.add_css_class("suggested-action");
+        connect_btn.set_sensitive(false);
+        conn_dropdown.set_sensitive(false);
 
         let conn_bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         conn_bar.append(&conn_dropdown);
@@ -217,8 +222,27 @@ impl SqlViewer {
         canvas_scroll.set_hexpand(true);
         canvas_scroll.set_child(Some(&canvas_overlay));
 
+        let canvas_placeholder = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        canvas_placeholder.set_halign(gtk::Align::Center);
+        canvas_placeholder.set_valign(gtk::Align::Center);
+        canvas_placeholder.set_can_target(false);
+        canvas_placeholder.add_css_class("dim-label");
+        let placeholder_icon = gtk::Image::from_icon_name("network-server-symbolic");
+        placeholder_icon.set_pixel_size(48);
+        let placeholder_title = gtk::Label::new(Some("No tables on the canvas"));
+        placeholder_title.add_css_class("title-3");
+        canvas_placeholder.append(&placeholder_icon);
+        canvas_placeholder.append(&placeholder_title);
+        canvas_placeholder.append(&gtk::Label::new(Some(
+            "Connect to a database, then right-click here to add a table",
+        )));
+
+        let canvas_frame = gtk::Overlay::new();
+        canvas_frame.set_child(Some(&canvas_scroll));
+        canvas_frame.add_overlay(&canvas_placeholder);
+
         let canvas_panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        canvas_panel.append(&canvas_scroll);
+        canvas_panel.append(&canvas_frame);
         canvas_panel.append(&canvas_resize_handle(&canvas_scroll));
 
         // --- Joins panel ---
@@ -299,9 +323,11 @@ impl SqlViewer {
             last_result: RefCell::default(),
             conn_model,
             conn_dropdown,
+            connect_btn: connect_btn.clone(),
             new_conn_btn,
             status_lbl,
             fixed,
+            canvas_placeholder,
             link_lines,
             joins_box,
             sql_buffer,
@@ -711,6 +737,12 @@ impl SqlViewer {
             self.remove_join(join);
         }
         self.link_lines.queue_draw();
+        self.update_canvas_placeholder();
+    }
+
+    fn update_canvas_placeholder(&self) {
+        self.canvas_placeholder
+            .set_visible(self.table_cards.borrow().is_empty());
     }
 
     fn add_table_card(self: &Rc<Self>, table: &str, x: f64, y: f64) {
@@ -721,6 +753,7 @@ impl SqlViewer {
         let card = self.build_table_card(table, &columns);
         self.fixed.put(&card.frame, x, y);
         self.table_cards.borrow_mut().push(card);
+        self.update_canvas_placeholder();
         self.set_status(&format!("Added “{table}” to the canvas."));
     }
 
@@ -1003,29 +1036,28 @@ impl SqlViewer {
                 .set_child(Some(&results_placeholder("Query executed — no rows.")));
         } else {
             let grid = gtk::Grid::new();
-            grid.set_row_spacing(1);
-            grid.set_column_spacing(1);
             for (c, name) in columns.iter().enumerate() {
-                let lbl = heading(name);
-                lbl.set_margin_top(6);
-                lbl.set_margin_bottom(6);
-                lbl.set_margin_start(10);
-                lbl.set_margin_end(10);
+                let lbl = gtk::Label::builder().label(name).xalign(0.0).build();
+                lbl.add_css_class("dt-grid-cell");
+                lbl.add_css_class("dt-grid-header");
                 grid.attach(&lbl, c as i32, 0, 1, 1);
             }
             for (r, row) in rows.iter().enumerate() {
                 for (c, value) in row.iter().enumerate() {
                     let lbl = gtk::Label::builder()
-                        .label(value.as_deref().unwrap_or(""))
+                        .label(value.as_deref().unwrap_or("NULL"))
                         .xalign(0.0)
                         .selectable(true)
                         .max_width_chars(30)
                         .ellipsize(gtk::pango::EllipsizeMode::End)
                         .build();
-                    lbl.set_margin_top(4);
-                    lbl.set_margin_bottom(4);
-                    lbl.set_margin_start(10);
-                    lbl.set_margin_end(10);
+                    lbl.add_css_class("dt-grid-cell");
+                    if value.is_none() {
+                        lbl.add_css_class("dt-null");
+                    }
+                    if r % 2 == 1 {
+                        lbl.add_css_class("dt-grid-odd");
+                    }
                     grid.attach(&lbl, c as i32, r as i32 + 1, 1, 1);
                 }
             }
@@ -1242,6 +1274,8 @@ impl SqlViewer {
                     .push(ConnectionConfig { name, kind, params });
                 this.conn_dropdown
                     .set_selected(this.conn_model.n_items() - 1);
+                this.conn_dropdown.set_sensitive(true);
+                this.connect_btn.set_sensitive(true);
                 dialog.close();
             }
         ));

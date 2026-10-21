@@ -1,6 +1,7 @@
 use crate::domain::contract::FeatureContract;
 use crate::infrastructure::ui::shared::input_output_widget::{InputOutputWidget, Options};
 
+pub const TITLE: &str = "HTML Entities";
 pub const DESCRIPTION: &str = "HTML entity encode / decode";
 
 pub struct Feature;
@@ -27,12 +28,11 @@ impl FeatureContract for Feature {
             output_language: Some("html"),
             ..Default::default()
         });
-        tool.add_button("Encode", |t| t.report("Encoded", Ok(encode(&t.input()))));
+        tool.add_button("Encode", |t| t.report(Ok(encode(&t.input()))));
         tool.add_button_with_class("Decode", None, |t| {
-            t.report(
-                "Decoded",
-                Ok(html_escape::decode_html_entities(&t.input()).into_owned()),
-            )
+            t.report(Ok(
+                html_escape::decode_html_entities(&t.input()).into_owned()
+            ))
         });
         tool.into_widget()
     }

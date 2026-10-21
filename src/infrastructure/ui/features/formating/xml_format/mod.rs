@@ -4,6 +4,7 @@ use quick_xml::{Reader, Writer};
 use crate::domain::contract::FeatureContract;
 use crate::infrastructure::ui::shared::input_output_widget::{InputOutputWidget, Options};
 
+pub const TITLE: &str = "XML Formatter";
 pub const DESCRIPTION: &str = "Format XML documents";
 
 pub struct Feature;
@@ -56,7 +57,7 @@ impl FeatureContract for Feature {
             output_language: Some("xml"),
             ..Default::default()
         });
-        tool.add_button("Format", |t| t.report("Formatted", format(&t.input())));
+        tool.add_button("Format", |t| t.report(format(&t.input())));
         tool.into_widget()
     }
 }

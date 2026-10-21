@@ -75,8 +75,8 @@
 
           shellHook = ''
             export XDG_DATA_DIRS="${pkgs.gtksourceview5}/share:${pkgs.gtk4}/share/gsettings-schemas/${pkgs.gtk4.name}:${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:''${XDG_DATA_DIRS:-}"
-            echo "Rust GTK4/Libadwaita development environment"
-            echo "$(rustc --version)"
+            echo "Rust GTK4/Libadwaita development environment" >&2
+            rustc --version >&2
           '';
         };
       }

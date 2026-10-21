@@ -1,0 +1,4 @@
+{
+    "rust-analyzer.server.path": "${workspaceFolder}/.vscode/rust-analyzer.sh",
+    "rust-analyzer.check.command": "clippy"
+}

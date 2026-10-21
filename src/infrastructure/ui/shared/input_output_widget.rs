@@ -1,9 +1,10 @@
 use std::rc::{Rc, Weak};
 
+use adw::prelude::*;
 use gtk::glib;
-use gtk::prelude::*;
 
 use super::code_view::CodeView;
+use crate::infrastructure::ui::feature_detail_page::toast;
 
 pub struct Options {
     pub input_label: &'static str,
@@ -19,8 +20,8 @@ impl Default for Options {
         Self {
             input_label: "Input",
             output_label: "Output",
-            input_height: 150,
-            output_height: 250,
+            input_height: 180,
+            output_height: 180,
             input_language: None,
             output_language: None,
         }
@@ -30,15 +31,15 @@ impl Default for Options {
 struct Inner {
     input_view: CodeView,
     output_view: CodeView,
-    output_scroll: gtk::ScrolledWindow,
+    output_panel: gtk::Box,
     buttons_box: gtk::Box,
     extra_box: gtk::Box,
-    status_label: gtk::Label,
 }
 
-/// Input editor + action buttons + read-only output, the layout shared by
-/// most single-transform tools. Button callbacks hold a weak handle, and the
-/// root widget owns the strong one, so closing the page frees everything.
+/// Action toolbar above an input editor and a read-only output, side by side
+/// when there is room and stacked otherwise. Button callbacks hold a weak
+/// handle, and the root widget owns the strong one, so closing the page frees
+/// everything.
 #[derive(Clone)]
 pub struct InputOutputWidget {
     inner: Rc<Inner>,
@@ -52,62 +53,131 @@ pub fn timestamp() -> String {
         .unwrap_or_default()
 }
 
-fn make_section(
+fn icon_button(icon: &str, tooltip: &str) -> gtk::Button {
+    let btn = gtk::Button::builder()
+        .icon_name(icon)
+        .tooltip_text(tooltip)
+        .valign(gtk::Align::Center)
+        .build();
+    btn.add_css_class("flat");
+    btn
+}
+
+/// A rounded card with a header row (title + `actions`) above a scrolled editor.
+fn panel(
     label: &str,
     view: &impl IsA<gtk::Widget>,
-    height: i32,
-) -> (gtk::Box, gtk::ScrolledWindow) {
-    let section = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    let lbl = gtk::Label::builder().label(label).xalign(0.0).build();
+    min_height: i32,
+    actions: &[gtk::Button],
+) -> gtk::Box {
+    let header = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    header.add_css_class("dt-panel-header");
+    let lbl = gtk::Label::builder()
+        .label(label)
+        .xalign(0.0)
+        .hexpand(true)
+        .build();
     lbl.add_css_class("heading");
-    let scroll = gtk::ScrolledWindow::new();
-    scroll.set_size_request(-1, height);
-    scroll.set_child(Some(view));
-    scroll.add_css_class("card");
-    section.append(&lbl);
-    section.append(&scroll);
-    (section, scroll)
+    header.append(&lbl);
+    for action in actions {
+        header.append(action);
+    }
+
+    let scroll = gtk::ScrolledWindow::builder()
+        .min_content_height(min_height)
+        .vexpand(true)
+        .hexpand(true)
+        .child(view)
+        .build();
+
+    let panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    panel.add_css_class("card");
+    panel.add_css_class("dt-panel");
+    panel.set_overflow(gtk::Overflow::Hidden);
+    panel.append(&header);
+    panel.append(&scroll);
+    panel
 }
 
 impl InputOutputWidget {
     pub fn new(opts: Options) -> Self {
-        let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
         let input_view = CodeView::new(true, opts.input_language);
         let output_view = CodeView::new(false, opts.output_language);
 
+        let clear_btn = icon_button("edit-clear-all-symbolic", "Clear");
+        let copy_btn = icon_button("edit-copy-symbolic", "Copy output");
+
+        let input_panel = panel(
+            opts.input_label,
+            input_view.widget(),
+            opts.input_height,
+            std::slice::from_ref(&clear_btn),
+        );
+        let output_panel = panel(
+            opts.output_label,
+            output_view.widget(),
+            opts.output_height,
+            std::slice::from_ref(&copy_btn),
+        );
+
+        let panes = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        panes.set_homogeneous(true);
+        panes.append(&input_panel);
+        panes.append(&output_panel);
+
+        let breakpoint = adw::Breakpoint::new(
+            adw::BreakpointCondition::parse("max-width: 720px").expect("valid breakpoint"),
+        );
+        breakpoint.add_setter(
+            &panes,
+            "orientation",
+            Some(&gtk::Orientation::Vertical.to_value()),
+        );
+        let panes_bin = adw::BreakpointBin::builder()
+            .width_request(300)
+            .height_request(360)
+            .vexpand(true)
+            .child(&panes)
+            .build();
+        panes_bin.add_breakpoint(breakpoint);
+
+        let extra_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let buttons_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        buttons_box.set_halign(gtk::Align::Center);
+        let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        toolbar.append(&extra_box);
+        toolbar.append(&buttons_box);
 
-        let status_label = gtk::Label::new(None);
-        status_label.add_css_class("dim-label");
-        status_label.set_halign(gtk::Align::Start);
-
-        let extra_box = gtk::Box::new(gtk::Orientation::Vertical, 8);
-
-        let (input_section, _) =
-            make_section(opts.input_label, input_view.widget(), opts.input_height);
-        let (output_section, output_scroll) =
-            make_section(opts.output_label, output_view.widget(), opts.output_height);
-
-        root.append(&input_section);
-        root.append(&extra_box);
-        root.append(&buttons_box);
-        root.append(&output_section);
-        root.append(&status_label);
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        root.set_vexpand(true);
+        root.append(&toolbar);
+        root.append(&panes_bin);
 
         let inner = Rc::new(Inner {
             input_view,
             output_view,
-            output_scroll,
+            output_panel,
             buttons_box,
             extra_box,
-            status_label,
         });
         let owned = Rc::clone(&inner);
         root.connect_destroy(move |_| {
             let _ = &owned;
         });
-        Self { inner, root }
+        let this = Self { inner, root };
+
+        let weak = this.weak();
+        clear_btn.connect_clicked(move |_| {
+            if let Some(tool) = Self::upgrade(&weak) {
+                tool.clear();
+            }
+        });
+        let weak = this.weak();
+        copy_btn.connect_clicked(move |_| {
+            if let Some(tool) = Self::upgrade(&weak) {
+                tool.copy_output();
+            }
+        });
+        this
     }
 
     fn weak(&self) -> (Weak<Inner>, glib::WeakRef<gtk::Box>) {
@@ -145,7 +215,7 @@ impl InputOutputWidget {
         btn
     }
 
-    #[allow(dead_code)]
+    /// Adds a widget (option, selector…) to the toolbar, before the buttons.
     pub fn add_extra_widget(&self, widget: &impl IsA<gtk::Widget>) {
         self.inner.extra_box.append(widget);
     }
@@ -172,7 +242,7 @@ impl InputOutputWidget {
             .output_view
             .widget()
             .remove_css_class("dt-error-text");
-        self.inner.output_scroll.remove_css_class("dt-error-frame");
+        self.inner.output_panel.remove_css_class("dt-error-frame");
         self.inner.output_view.set_text(text);
     }
 
@@ -181,51 +251,35 @@ impl InputOutputWidget {
             .output_view
             .widget()
             .add_css_class("dt-error-text");
-        self.inner.output_scroll.add_css_class("dt-error-frame");
+        self.inner.output_panel.add_css_class("dt-error-frame");
         self.inner
             .output_view
             .set_text(&format!("⚠ Error: {message}"));
-        self.inner.status_label.set_text("");
     }
 
-    pub fn set_status(&self, text: &str) {
-        self.inner.status_label.set_text(text);
-    }
-
-    /// Reports a transform's outcome: the output plus "<verb> at HH:MM:SS",
-    /// or the error message.
-    pub fn report(&self, verb: &str, result: Result<String, String>) {
+    /// Shows a transform's outcome: the output, or the error message.
+    pub fn report(&self, result: Result<String, String>) {
         match result {
-            Ok(out) => {
-                self.set_output(&out);
-                self.set_status(&format!("{verb} at {}", timestamp()));
-            }
+            Ok(out) => self.set_output(&out),
             Err(e) => self.set_error(&e),
         }
     }
 
     fn copy_output(&self) {
-        let buf = self.inner.output_view.buffer();
-        if buf.char_count() == 0 {
+        let text = self.inner.output_view.text();
+        if text.is_empty() {
             return;
         }
-        let (start, end) = buf.bounds();
-        buf.select_range(&start, &end);
-        buf.copy_clipboard(&self.inner.output_view.widget().clipboard());
-        let end = buf.end_iter();
-        buf.select_range(&end, &end);
-        self.set_status(&format!("Copied to clipboard at {}", timestamp()));
+        self.root.clipboard().set_text(&text);
+        toast(&self.root, "Copied to clipboard");
     }
 
     fn clear(&self) {
         self.inner.input_view.set_text("");
         self.set_output("");
-        self.inner.status_label.set_text("");
     }
 
     pub fn into_widget(self) -> gtk::Widget {
-        self.add_button_with_class("Copy output", None, Self::copy_output);
-        self.add_button_with_class("Clear", None, Self::clear);
         self.root.upcast()
     }
 }

@@ -1,16 +1,27 @@
 {
-    // Requires the CodeLLDB extension; open VSCode from `nix develop` so
-    // cargo and the GTK libraries are on the environment.
+    // F5 = debug, Ctrl+F5 = run without debugging. Requires the CodeLLDB
+    // extension (vadimcn.vscode-lldb); the build goes through `nix develop`.
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "dupotDevTools",
+            "name": "dupotDevTools (debug)",
             "type": "lldb",
             "request": "launch",
-            "cargo": {
-                "args": ["build", "--bin=dupot-dev-tools"]
-            },
-            "cwd": "${workspaceFolder}"
+            "preLaunchTask": "cargo build",
+            "program": "${workspaceFolder}/target/debug/dupot-dev-tools",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/target/vscode.env",
+            "sourceLanguages": ["rust"]
+        },
+        {
+            "name": "dupotDevTools (release)",
+            "type": "lldb",
+            "request": "launch",
+            "preLaunchTask": "cargo build --release",
+            "program": "${workspaceFolder}/target/release/dupot-dev-tools",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/target/vscode.env",
+            "sourceLanguages": ["rust"]
         }
     ]
 }

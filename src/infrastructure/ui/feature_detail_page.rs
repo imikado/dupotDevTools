@@ -3,33 +3,55 @@ use adw::prelude::*;
 use crate::domain::contract::FeatureContract;
 use crate::domain::entity::FeatureEntity;
 
-use super::app_window::title_case;
-
 pub fn build(entity: &FeatureEntity, feature: &dyn FeatureContract) -> adw::NavigationPage {
-    let toolbar_view = adw::ToolbarView::new();
-    toolbar_view.add_top_bar(&adw::HeaderBar::new());
+    let header_bar = adw::HeaderBar::new();
+    header_bar.set_title_widget(Some(&adw::WindowTitle::new(
+        entity.title,
+        entity.description,
+    )));
 
-    let scroll = gtk::ScrolledWindow::new();
-    scroll.set_vexpand(true);
-    scroll.set_hexpand(true);
+    let toolbar_view = adw::ToolbarView::new();
+    toolbar_view.add_top_bar(&header_bar);
 
     let content = feature.widget();
     let outer: gtk::Widget = if feature.full_width() {
         content.set_hexpand(true);
         content.upcast()
     } else {
-        let clamp = adw::Clamp::new();
-        clamp.set_maximum_size(860);
-        clamp.set_tightening_threshold(640);
-        clamp.set_child(Some(&content));
-        clamp.upcast()
+        adw::Clamp::builder()
+            .maximum_size(1200)
+            .tightening_threshold(900)
+            .child(&content)
+            .build()
+            .upcast()
     };
-    outer.set_margin_top(24);
-    outer.set_margin_bottom(24);
-    outer.set_margin_start(12);
-    outer.set_margin_end(12);
-    scroll.set_child(Some(&outer));
+    outer.set_margin_top(18);
+    outer.set_margin_bottom(18);
+    outer.set_margin_start(18);
+    outer.set_margin_end(18);
 
-    toolbar_view.set_content(Some(&scroll));
-    adw::NavigationPage::new(&toolbar_view, &title_case(entity.name))
+    let scroll = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .hexpand(true)
+        .child(&outer)
+        .build();
+
+    // Features reach this through `widget.ancestor(ToastOverlay)`.
+    let toasts = adw::ToastOverlay::new();
+    toasts.set_child(Some(&scroll));
+    toolbar_view.set_content(Some(&toasts));
+    adw::NavigationPage::new(&toolbar_view, entity.title)
+}
+
+/// Shows a short notification on the page hosting `widget`.
+pub fn toast(widget: &impl IsA<gtk::Widget>, message: &str) {
+    if let Some(overlay) = widget.ancestor(adw::ToastOverlay::static_type()) {
+        let toast = adw::Toast::new(message);
+        toast.set_timeout(2);
+        overlay
+            .downcast_ref::<adw::ToastOverlay>()
+            .unwrap()
+            .add_toast(toast);
+    }
 }

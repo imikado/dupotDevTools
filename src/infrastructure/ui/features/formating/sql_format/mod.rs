@@ -3,6 +3,7 @@ use sqlformat::{FormatOptions, Indent, QueryParams};
 use crate::domain::contract::FeatureContract;
 use crate::infrastructure::ui::shared::input_output_widget::{InputOutputWidget, Options};
 
+pub const TITLE: &str = "SQL Formatter";
 pub const DESCRIPTION: &str = "Format SQL queries";
 
 pub struct Feature;
@@ -24,7 +25,7 @@ impl FeatureContract for Feature {
             output_language: Some("sql"),
             ..Default::default()
         });
-        tool.add_button("Format", |t| t.report("Formatted", Ok(format(&t.input()))));
+        tool.add_button("Format", |t| t.report(Ok(format(&t.input()))));
         tool.into_widget()
     }
 }

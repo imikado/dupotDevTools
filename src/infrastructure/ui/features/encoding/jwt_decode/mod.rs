@@ -7,6 +7,7 @@ use crate::domain::contract::FeatureContract;
 use crate::infrastructure::ui::shared::input_output_widget::{InputOutputWidget, Options};
 use crate::infrastructure::ui::shared::json::to_pretty_json;
 
+pub const TITLE: &str = "JWT Decoder";
 pub const DESCRIPTION: &str = "Decode JWT tokens to JSON";
 
 const URL_SAFE_LENIENT: GeneralPurpose = GeneralPurpose::new(
@@ -40,7 +41,7 @@ impl FeatureContract for Feature {
             output_language: Some("json"),
             ..Default::default()
         });
-        tool.add_button("Decode", |t| t.report("Decoded", decode(&t.input())));
+        tool.add_button("Decode", |t| t.report(decode(&t.input())));
         tool.into_widget()
     }
 }

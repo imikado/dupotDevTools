@@ -23,8 +23,7 @@ impl CodeView {
     pub fn new(editable: bool, language: Option<&str>) -> Self {
         let buffer = sourceview5::Buffer::new(None);
         let view = sourceview5::View::with_buffer(&buffer);
-        view.set_show_line_numbers(true);
-        view.set_highlight_current_line(editable);
+        view.set_show_line_numbers(false);
         view.set_tab_width(4);
         view.set_insert_spaces_instead_of_tabs(true);
         view.set_monospace(true);
@@ -65,10 +64,6 @@ impl CodeView {
 
     pub fn set_text(&self, text: &str) {
         self.buffer.set_text(text);
-    }
-
-    pub fn buffer(&self) -> &sourceview5::Buffer {
-        &self.buffer
     }
 
     pub fn widget(&self) -> &sourceview5::View {
