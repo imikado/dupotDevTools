@@ -4,12 +4,27 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
+        };
+
+        # Cross-compilation to Windows (build_windows_cross.sh): Rust with the
+        # windows-gnu std, and the MinGW-w64 GCC/binutils (UCRT runtime, like
+        # the MSYS2 ucrt64 GTK packages) used as linker and for windres/objdump.
+        mingw = pkgs.pkgsCross.ucrt64.buildPackages;
+        rustWindows = pkgs.rust-bin.stable.latest.default.override {
+          targets = [ "x86_64-pc-windows-gnu" ];
+        };
 
         nativeBuildInputs = with pkgs; [
           pkg-config
@@ -30,6 +45,15 @@
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
           inherit nativeBuildInputs buildInputs;
+
+          # Shown in the About dialog (the Nix sandbox has no .git).
+          env = {
+            DUPOT_BUILD_PACKAGE = "nix";
+            DUPOT_BUILD_DATE =
+              let d = self.lastModifiedDate or "";
+              in if d == "" then "" else
+                "${builtins.substring 0 4 d}-${builtins.substring 4 2 d}-${builtins.substring 6 2 d}";
+          };
 
           desktopItems = [
             (pkgs.makeDesktopItem {
@@ -77,6 +101,30 @@
             export XDG_DATA_DIRS="${pkgs.gtksourceview5}/share:${pkgs.gtk4}/share/gsettings-schemas/${pkgs.gtk4.name}:${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:''${XDG_DATA_DIRS:-}"
             echo "Rust GTK4/Libadwaita development environment" >&2
             rustc --version >&2
+          '';
+        };
+
+        devShells.windows = pkgs.mkShell {
+          packages = [
+            rustWindows
+            mingw.gcc
+            mingw.binutils
+            pkgs.pkg-config
+            pkgs.glib.dev # glib-compile-schemas
+            pkgs.gtk4.dev # gtk4-update-icon-cache
+            pkgs.python3
+            pkgs.zstd
+            pkgs.curl
+            pkgs.zip
+            # Runs gdk-pixbuf-query-loaders.exe, and lets you try the result:
+            # wine build-windows-cross/DupotDevTools/bin/dupot-dev-tools.exe
+            pkgs.wineWow64Packages.stable
+          ];
+
+          CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "x86_64-w64-mingw32-gcc";
+
+          shellHook = ''
+            echo "Windows cross-compilation environment (x86_64-pc-windows-gnu)" >&2
           '';
         };
       }

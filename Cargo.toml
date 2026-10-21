@@ -1,6 +1,6 @@
 [package]
 name = "dupot-dev-tools"
-version = "1.0.0"
+version = "2.0.0"
 edition = "2024"
 description = "The developer's Swiss Army knife for the Linux desktop"
 license = "LGPL-2.1-only"
@@ -39,5 +39,5 @@ mysql = { version = "28", default-features = false, features = ["minimal-rust"] 
 lto = true
 strip = true
 
-[target.'cfg(windows)'.build-dependencies]
+[build-dependencies]
 winresource = "0.1"

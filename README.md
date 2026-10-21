@@ -79,7 +79,7 @@ A visual query builder that lets you understand a database at a glance:
 | Formats | `serde_json`, `serde_yaml_ng`, `quick-xml`, `sqlformat`, `html2text`, `csv` |
 | Text & time | `regex`, `similar` (diff), `chrono`, `croner` (cron), `uuid`, `ulid` |
 | Encoding / crypto | `base64`, `percent-encoding`, `html-escape`, RustCrypto (`md-5`, `sha1`, `sha2`, `sha3`, `blake2`) |
-| Build & packaging | Cargo, Nix flake, Flatpak (GNOME 50 runtime), MSYS2 for Windows |
+| Build & packaging | Cargo, Nix flake, Flatpak (GNOME 50 runtime), cross-compiled Windows build (MinGW-w64 + MSYS2 packages) |
 
 ## 🚀 Getting started
 
@@ -109,7 +109,8 @@ nix run github:imikado/dupotDevTools   # build and launch
 
 ### Windows
 
-Build from an [MSYS2](https://www.msys2.org) UCRT64 shell with `./build_windows.sh` (see [Packaging](#-packaging)).
+Download the zip, extract it anywhere and run `DupotDevTools\bin\dupot-dev-tools.exe` (Windows 10 or newer).
+To build it yourself, see [Packaging](#-packaging): it cross-compiles from Linux, no Windows machine needed.
 
 ## 👩‍💻 Development
 
@@ -130,13 +131,36 @@ All of these go through [`.vscode/nix-cargo.sh`](.vscode/nix-cargo.sh) and [`.vs
 
 ## 📦 Packaging
 
-| Target | Command | Output |
-|---|---|---|
-| Nix | `nix build` | `result/bin/dupot-dev-tools` (runs the tests too) |
-| Flatpak | `./build_flatpak.sh` | `org.dupot.devtools.flatpak` (GNOME 50 runtime) |
-| Windows | `./build_windows.sh` in MSYS2 UCRT64 | `export/windows/DupotDevTools-<version>-windows-x64.zip` |
+Every package is built from Linux with one command:
+
+```bash
+./build_all.sh                      # flatpak + appimage + windows
+./build_all.sh appimage windows     # or pick targets
+```
+
+| Target | Script | Needs | Output |
+|---|---|---|---|
+| Flatpak | `./build_flatpak.sh` | flatpak | `export/flatpak/DupotDevTools-<version>.flatpak` (GNOME 50 runtime) |
+| AppImage | `./build_appimage.sh` | Docker | `export/appimage/DupotDevTools-<version>-x86_64.AppImage` |
+| Windows | `./build_windows_cross.sh` | Nix | `export/windows/DupotDevTools-<version>-windows-x64.zip` |
+| Windows, natively | `./build_windows.sh` in an MSYS2 UCRT64 shell | MSYS2 | same zip |
+| Nix | `nix build` | Nix | `result/bin/dupot-dev-tools` (runs the tests too) |
+
+**AppImage** (`build_appimage.sh`) builds inside an Ubuntu 24.04 container ([`export/appimage/Dockerfile`](export/appimage/Dockerfile)): its GTK 4.14 / Libadwaita 1.5 are the app's minimum versions and its glibc 2.39 keeps the AppImage running on Ubuntu 24.04+, Debian 13+, Fedora 40+ and similar. `linuxdeploy` and its GTK plugin bundle the libraries.
+
+**Cross-compiling for Windows** (`build_windows_cross.sh`) only needs Nix: it enters `nix develop .#windows` (Rust with the `x86_64-pc-windows-gnu` target, MinGW-w64, Wine), downloads the prebuilt GTK4 / Libadwaita / GtkSourceView Windows packages from MSYS2 `ucrt64` with their dependencies, builds the `.exe` (icon embedded) and bundles it with every DLL and GTK data file it needs. Try the result with:
+
+```bash
+nix develop .#windows -c wine build-windows-cross/DupotDevTools/bin/dupot-dev-tools.exe
+```
 
 Flatpak metadata (manifest, desktop file, AppStream, icons) lives in [`export/flatpak/`](export/flatpak/); the icons are generated from [`src/assets/logo.svg`](src/assets/logo.svg).
+
+### Which version am I running?
+
+**☰ → About** shows the version with its build date, e.g. `1.0.0 (2026-10-21)`, plus a link to [dupot.org](https://www.dupot.org) for the latest release. *Troubleshooting* lists the full build details (package type, platform) to copy into a bug report.
+
+The version number comes from `Cargo.toml`; [`build.rs`](build.rs) captures the build date, and each packaging script passes its package type (`DUPOT_BUILD_DATE`, `DUPOT_BUILD_PACKAGE`).
 
 ## 🏗️ Architecture
 

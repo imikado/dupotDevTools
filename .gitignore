@@ -50,3 +50,7 @@ flatpak/org.dupot.dupot-dev-tools.yml
 /repo
 /build-windows
 *.flatpak
+/build-windows-cross
+/export/windows
+/export/appimage/*.AppImage
+/export/flatpak/.*.generated.yml

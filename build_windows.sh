@@ -28,6 +28,10 @@ build_dir="build-windows"
 bundle="$build_dir/$app_name"
 dist_dir="export/windows"
 
+# Build date shown in the About dialog.
+build_date="$(date -u +%F)"
+export DUPOT_BUILD_PACKAGE=windows DUPOT_BUILD_DATE="$build_date"
+
 if [[ "${MSYSTEM:-}" != "UCRT64" ]]; then
     echo "error: run this from an MSYS2 UCRT64 shell (MSYSTEM=${MSYSTEM:-unset})" >&2
     exit 2
@@ -80,6 +84,10 @@ glib-compile-schemas "$bundle/share/glib-2.0/schemas"
 
 # Icon themes: symbolic icons used throughout the UI come from Adwaita.
 cp -r "$prefix/share/icons/Adwaita" "$prefix/share/icons/hicolor" "$bundle/share/icons/"
+for size in 16 24 32 48 64 128 256 512; do
+    install -Dm644 "export/flatpak/${size}x${size}.png" \
+        "$bundle/share/icons/hicolor/${size}x${size}/apps/org.dupot.devtools.png"
+done
 for theme in Adwaita hicolor; do
     gtk4-update-icon-cache -q -t -f "$bundle/share/icons/$theme" 2>/dev/null || true
 done

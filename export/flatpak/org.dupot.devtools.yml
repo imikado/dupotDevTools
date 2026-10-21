@@ -19,6 +19,9 @@ build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
   env:
     CARGO_HOME: /run/build/dupot-dev-tools/cargo
+    # Shown in the About dialog; filled in by build_flatpak.sh.
+    DUPOT_BUILD_PACKAGE: flatpak
+    DUPOT_BUILD_DATE: "@BUILD_DATE@"
 
 modules:
   - name: dupot-dev-tools
@@ -47,6 +50,7 @@ modules:
           - result
           - build-dir
           - build-windows
+          - build-windows-cross
           - repo
           - .flatpak-builder
           - .git

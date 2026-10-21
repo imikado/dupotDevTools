@@ -27,6 +27,9 @@ local_repo="${FLATPAK_REPO:-repo}"
 output="${1:-${app_id}.flatpak}"
 scope="${FLATPAK_SCOPE:---system}"
 
+# Build date shown in the About dialog.
+build_date="$(date -u +%F)"
+
 if ! command -v flatpak >/dev/null 2>&1; then
     echo "error: flatpak is not installed" >&2
     exit 2
@@ -56,9 +59,14 @@ for ref in org.gnome.Platform//50 org.gnome.Sdk//50 org.freedesktop.Sdk.Extensio
     fi
 done
 
+# Manifest copy with the build date filled in (same folder, so its
+# relative source path still points at the repo root).
+generated="export/flatpak/.${app_id}.generated.yml"
+sed -e "s/@BUILD_DATE@/$build_date/" "$manifest" > "$generated"
+
 echo "=== Building $app_id from $manifest ==="
 flatpak run --command=flatpak-builder org.flatpak.Builder \
-    --force-clean --repo="$local_repo" "$build_dir" "$manifest"
+    --force-clean --repo="$local_repo" "$build_dir" "$generated"
 
 echo "=== Bundling -> $output ==="
 # --runtime-repo points the bundle at Flathub for org.gnome.Platform, so

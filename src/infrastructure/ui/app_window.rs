@@ -4,13 +4,14 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
 
+use crate::domain::entity::app_info::APP;
 use crate::infrastructure::service::feature_loader_service::FeatureLoaderService;
 use crate::infrastructure::ui::features::RegisteredFeature;
 
 use super::feature_detail_page;
 
-const APP_ID: &str = "org.dupot.devtools";
-const APP_NAME: &str = "Dupot Dev Tools";
+const APP_ID: &str = APP.id;
+const APP_NAME: &str = APP.name;
 
 const APP_CSS: &str = "
 .dt-error-frame {
@@ -585,17 +586,21 @@ fn sidebar_row(label_text: &str, icon_name: &str, count: usize) -> gtk::ListBoxR
 }
 
 fn show_about(parent: &adw::ApplicationWindow) {
+    let build = APP.build;
     let about = adw::AboutDialog::builder()
-        .application_name(APP_NAME)
-        .version(env!("CARGO_PKG_VERSION"))
-        .developer_name("Michael Bertocchi")
-        .developers(["Michael Bertocchi"])
-        .copyright("© Michael Bertocchi")
+        .application_name(APP.name)
+        .version(build.version_label())
+        .developer_name(APP.developer)
+        .developers([APP.developer])
+        .copyright(format!("© {}", APP.developer))
         .comments("The developer's Swiss Army knife: format, convert, encode, decode, hash… and explore your SQL databases visually. Everything stays on your machine.")
-        .website("https://www.dupot.org")
-        .issue_url("https://github.com/imikado/dupotDevTools/issues")
+        .website(APP.website)
+        .issue_url(APP.issue_url)
         .license_type(gtk::License::Lgpl21)
+        .debug_info(build.details())
+        .debug_info_filename(format!("{}-build-info.txt", APP.id))
         .build();
+    about.add_link("Latest version on dupot.org", APP.website);
     let has_icon =
         gdk::Display::default().is_some_and(|d| gtk::IconTheme::for_display(&d).has_icon(APP_ID));
     if has_icon {
