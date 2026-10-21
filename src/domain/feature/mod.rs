@@ -5,4 +5,5 @@ pub mod convert;
 pub mod database;
 pub mod encoding;
 pub mod formating;
+pub mod parsing;
 pub mod string;

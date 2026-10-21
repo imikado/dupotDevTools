@@ -69,4 +69,35 @@ impl CodeView {
     pub fn widget(&self) -> &sourceview5::View {
         &self.view
     }
+
+    pub fn connect_changed(&self, callback: impl Fn() + 'static) {
+        self.buffer.connect_changed(move |_| callback());
+    }
+
+    /// Highlights `ranges` (byte offsets into the text), replacing any
+    /// previous highlight.
+    pub fn highlight(&self, ranges: &[(usize, usize)]) {
+        const TAG: &str = "dt-highlight";
+        let tag = self.buffer.tag_table().lookup(TAG).unwrap_or_else(|| {
+            let tag = gtk::TextTag::builder()
+                .name(TAG)
+                .background_rgba(&gtk::gdk::RGBA::new(0.96, 0.83, 0.18, 0.45))
+                .build();
+            self.buffer.tag_table().add(&tag);
+            tag
+        });
+        let (start, end) = self.buffer.bounds();
+        self.buffer.remove_tag(&tag, &start, &end);
+
+        let text = self.text();
+        let char_offset = |byte: usize| text[..byte.min(text.len())].chars().count() as i32;
+        for &(from, to) in ranges {
+            if from == to || !text.is_char_boundary(from) || !text.is_char_boundary(to) {
+                continue;
+            }
+            let start = self.buffer.iter_at_offset(char_offset(from));
+            let end = self.buffer.iter_at_offset(char_offset(to));
+            self.buffer.apply_tag(&tag, &start, &end);
+        }
+    }
 }

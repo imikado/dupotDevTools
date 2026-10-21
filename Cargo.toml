@@ -25,6 +25,12 @@ sha2 = "0.11"
 sha3 = "0.12"
 blake2 = "0.11"
 csv = "1"
+chrono = "0.4"
+uuid = { version = "1", features = ["v4", "v7"] }
+ulid = "3"
+regex = "1"
+similar = "3"
+croner = "4"
 rusqlite = { version = "0.40", features = ["bundled"] }
 postgres = "0.19"
 mysql = { version = "28", default-features = false, features = ["minimal-rust"] }

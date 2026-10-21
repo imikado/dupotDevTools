@@ -47,6 +47,19 @@ pub struct InputOutputWidget {
     root: gtk::Box,
 }
 
+/// Non-owning handle, for callbacks stored on widgets inside the tool.
+#[derive(Clone)]
+pub struct WeakInputOutputWidget(Weak<Inner>, glib::WeakRef<gtk::Box>);
+
+impl WeakInputOutputWidget {
+    pub fn upgrade(&self) -> Option<InputOutputWidget> {
+        Some(InputOutputWidget {
+            inner: self.0.upgrade()?,
+            root: self.1.upgrade()?,
+        })
+    }
+}
+
 pub fn timestamp() -> String {
     glib::DateTime::now_local()
         .and_then(|d| d.format("%H:%M:%S"))
@@ -54,7 +67,7 @@ pub fn timestamp() -> String {
         .unwrap_or_default()
 }
 
-fn icon_button(icon: &str, tooltip: &str) -> gtk::Button {
+pub fn icon_button(icon: &str, tooltip: &str) -> gtk::Button {
     let btn = gtk::Button::builder()
         .icon_name(icon)
         .tooltip_text(tooltip)
@@ -65,7 +78,7 @@ fn icon_button(icon: &str, tooltip: &str) -> gtk::Button {
 }
 
 /// A rounded card with a header row (title + `actions`) above a scrolled editor.
-fn panel(
+pub fn panel(
     label: &str,
     view: &impl IsA<gtk::Widget>,
     min_height: i32,
@@ -181,15 +194,16 @@ impl InputOutputWidget {
         this
     }
 
-    fn weak(&self) -> (Weak<Inner>, glib::WeakRef<gtk::Box>) {
-        (Rc::downgrade(&self.inner), self.root.downgrade())
+    pub fn downgrade(&self) -> WeakInputOutputWidget {
+        WeakInputOutputWidget(Rc::downgrade(&self.inner), self.root.downgrade())
     }
 
-    fn upgrade((inner, root): &(Weak<Inner>, glib::WeakRef<gtk::Box>)) -> Option<Self> {
-        Some(Self {
-            inner: inner.upgrade()?,
-            root: root.upgrade()?,
-        })
+    fn weak(&self) -> WeakInputOutputWidget {
+        self.downgrade()
+    }
+
+    fn upgrade(weak: &WeakInputOutputWidget) -> Option<Self> {
+        weak.upgrade()
     }
 
     pub fn add_button(&self, label: &str, callback: impl Fn(&Self) + 'static) -> gtk::Button {
@@ -225,9 +239,23 @@ impl InputOutputWidget {
         self.inner.input_view.text()
     }
 
-    #[allow(dead_code)]
     pub fn set_input(&self, text: &str) {
         self.inner.input_view.set_text(text);
+    }
+
+    /// Runs `callback` after every edit of the input.
+    pub fn connect_input_changed(&self, callback: impl Fn(&Self) + 'static) {
+        let weak = self.weak();
+        self.inner.input_view.connect_changed(move || {
+            if let Some(tool) = Self::upgrade(&weak) {
+                callback(&tool);
+            }
+        });
+    }
+
+    /// Highlights byte ranges of the input text.
+    pub fn highlight_input(&self, ranges: &[(usize, usize)]) {
+        self.inner.input_view.highlight(ranges);
     }
 
     pub fn set_input_language(&self, language: Option<&str>) {

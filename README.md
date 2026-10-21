@@ -40,15 +40,20 @@ Dupot Dev Tools gathers all those small everyday utilities in **one desktop app*
 | 🎨 **Formatting** | JSON Formatter | Prettify or minify JSON |
 | | SQL Formatter | Format SQL queries |
 | | XML Formatter | Format XML documents |
-| 🔄 **Convert** | YAML ↔ JSON | Convert in both directions |
+| 🔄 **Convert** | Timestamp ↔ Date | Unix timestamps (s, ms, µs, ns auto-detected) ↔ dates: UTC, local, ISO 8601, RFC 2822, relative time |
+| | YAML ↔ JSON | Convert in both directions |
 | | HTML to Text | Strip HTML tags to plain text |
 | 🔐 **Encoding** | Base64 | Encode / decode Base64 |
 | | URL Encoding | Percent-encode / decode |
 | | HTML Entities | Encode / decode HTML entities |
 | | JWT Decoder | Decode JWT tokens to readable JSON |
 | 🔤 **String** | Hash Generator | MD5, SHA-1, SHA-2, SHA-3, BLAKE2b digests |
+| | Regex Tester | Live match highlighting, capture groups (numbered and named), replace with `$1` / `${name}` |
+| | Text Diff | Compare two texts: colored unified diff, stats, ignore whitespace / case |
+| | UUID / ULID | Generate UUID v4 / v7, ULID, in bulk and any format; inspect version and creation date |
+| 🧮 **Parsing** | Cron Parser | Explain a cron expression in plain English and list the next runs |
 
-Every text tool shares the same layout: syntax-highlighted input and output side by side (stacked on narrow windows), one-click copy, and errors shown inline.
+Every text tool shares the same layout: syntax-highlighted input and output side by side (stacked on narrow windows), one-click copy, and errors shown inline. Timestamp, UUID, Regex, Diff and Cron update live as you type.
 
 ## 🗄️ Spotlight: SQL Viewer
 
@@ -72,6 +77,7 @@ A visual query builder that lets you understand a database at a glance:
 | UI | GTK 4 + Libadwaita via [gtk-rs](https://gtk-rs.org), GtkSourceView 5 for code editors |
 | Databases | `rusqlite` (bundled SQLite), `postgres`, `mysql` (pure-Rust, no client libraries needed) |
 | Formats | `serde_json`, `serde_yaml_ng`, `quick-xml`, `sqlformat`, `html2text`, `csv` |
+| Text & time | `regex`, `similar` (diff), `chrono`, `croner` (cron), `uuid`, `ulid` |
 | Encoding / crypto | `base64`, `percent-encoding`, `html-escape`, RustCrypto (`md-5`, `sha1`, `sha2`, `sha3`, `blake2`) |
 | Build & packaging | Cargo, Nix flake, Flatpak (GNOME 50 runtime), MSYS2 for Windows |
 

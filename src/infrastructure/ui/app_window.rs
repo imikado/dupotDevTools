@@ -41,6 +41,7 @@ textview.dt-error-text text {
 .dt-section-encoding { background: linear-gradient(135deg, #57e389, #26a269); }
 .dt-section-formating { background: linear-gradient(135deg, #ffa348, #e66100); }
 .dt-section-string   { background: linear-gradient(135deg, #f66151, #c01c28); }
+.dt-section-parsing  { background: linear-gradient(135deg, #5bc8af, #1a8a7a); }
 
 .dt-panel {
     border-radius: 12px;
@@ -54,6 +55,11 @@ textview.dt-error-text text {
 .dt-panel textview,
 .dt-panel textview text {
     background: transparent;
+}
+
+.dt-panel textview,
+entry.monospace {
+    font-family: monospace;
 }
 
 .dt-grid-cell {

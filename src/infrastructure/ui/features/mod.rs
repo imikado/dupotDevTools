@@ -14,6 +14,7 @@ pub mod convert;
 pub mod database;
 pub mod encoding;
 pub mod formating;
+pub mod parsing;
 pub mod string;
 
 /// A tool as shown by the UI: its domain entity, icon and view factory.
@@ -42,6 +43,7 @@ macro_rules! feature {
 pub fn registry() -> Vec<RegisteredFeature> {
     vec![
         feature!(convert::html_to_text),
+        feature!(convert::timestamp),
         feature!(convert::yaml_json),
         feature!(database::sql_viewer),
         feature!(encoding::base64_encoding),
@@ -51,6 +53,10 @@ pub fn registry() -> Vec<RegisteredFeature> {
         feature!(formating::json_format),
         feature!(formating::sql_format),
         feature!(formating::xml_format),
+        feature!(parsing::cron_parser),
         feature!(string::hash),
+        feature!(string::regex_tester),
+        feature!(string::text_diff),
+        feature!(string::uuid_generator),
     ]
 }
