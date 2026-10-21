@@ -13,6 +13,15 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
 
 version="$(grep -m1 -oP '^version = "\K[^"]+' Cargo.toml)"
+# Cargo.toml is the single source of the version; the release notes in the
+# AppStream file (shown by software centers) are written by hand.
+appdata="export/flatpak/org.dupot.devtools.appdata.xml"
+if ! grep -q "<release [^>]*version=\"$version\"" "$appdata"; then
+    echo "error: no <release version=\"$version\"> entry in $appdata" >&2
+    echo "       add the release notes for $version (version from Cargo.toml)" >&2
+    exit 2
+fi
+
 targets=("$@")
 ((${#targets[@]})) || targets=(flatpak appimage windows)
 
