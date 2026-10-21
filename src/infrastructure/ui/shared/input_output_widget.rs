@@ -4,6 +4,7 @@ use adw::prelude::*;
 use gtk::glib;
 
 use super::code_view::CodeView;
+use crate::domain::error::DomainResult;
 use crate::infrastructure::ui::feature_detail_page::toast;
 
 pub struct Options {
@@ -258,10 +259,10 @@ impl InputOutputWidget {
     }
 
     /// Shows a transform's outcome: the output, or the error message.
-    pub fn report(&self, result: Result<String, String>) {
+    pub fn report(&self, result: DomainResult<String>) {
         match result {
             Ok(out) => self.set_output(&out),
-            Err(e) => self.set_error(&e),
+            Err(e) => self.set_error(e.message()),
         }
     }
 

@@ -1,39 +1,11 @@
-//! Thin wrapper around SQLite / PostgreSQL / MySQL connections.
-
-use std::collections::BTreeMap;
+//! SQLite / PostgreSQL / MySQL implementation of the domain's
+//! `DatabaseRepository`.
 
 use mysql::prelude::Queryable;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DbKind {
-    Sqlite,
-    Postgresql,
-    Mysql,
-}
-
-impl DbKind {
-    pub const ALL: [DbKind; 3] = [DbKind::Sqlite, DbKind::Postgresql, DbKind::Mysql];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            DbKind::Sqlite => "SQLite",
-            DbKind::Postgresql => "PostgreSQL",
-            DbKind::Mysql => "MySQL",
-        }
-    }
-
-    pub fn default_port(self) -> &'static str {
-        match self {
-            DbKind::Sqlite => "",
-            DbKind::Postgresql => "5432",
-            DbKind::Mysql => "3306",
-        }
-    }
-}
-
-pub type ConnectionParams = BTreeMap<&'static str, String>;
-pub type Cell = Option<String>;
-pub type QueryResult = (Vec<String>, Vec<Vec<Cell>>);
+use crate::domain::contract::database_repository::DatabaseRepository;
+use crate::domain::entity::database::{Cell, ConnectionConfig, DbKind, QueryResult};
+use crate::domain::error::{DomainError, DomainResult};
 
 enum Connection {
     Sqlite(rusqlite::Connection),
@@ -46,66 +18,46 @@ pub struct DatabaseApi {
     conn: Option<Connection>,
 }
 
-fn param<'a>(params: &'a ConnectionParams, key: &str) -> &'a str {
-    params.get(key).map(String::as_str).unwrap_or("")
-}
-
-fn port(params: &ConnectionParams, kind: DbKind) -> Result<u16, String> {
-    let raw = match param(params, "port") {
-        "" => kind.default_port(),
-        p => p,
-    };
-    raw.parse().map_err(|_| format!("Invalid port: {raw}"))
-}
-
-fn host(params: &ConnectionParams) -> &str {
-    match param(params, "host") {
-        "" => "localhost",
-        h => h,
-    }
-}
-
-impl DatabaseApi {
-    pub fn connect(&mut self, kind: DbKind, params: &ConnectionParams) -> Result<(), String> {
+impl DatabaseRepository for DatabaseApi {
+    fn connect(&mut self, config: &ConnectionConfig) -> DomainResult<()> {
         self.close();
-        let conn = match kind {
+        let conn = match config.kind {
             DbKind::Sqlite => {
-                let path = param(params, "path");
+                let path = config.param("path");
                 if path.is_empty() {
-                    return Err("A database file path is required.".into());
+                    return Err(DomainError::new("A database file path is required."));
                 }
-                Connection::Sqlite(rusqlite::Connection::open(path).map_err(|e| e.to_string())?)
+                Connection::Sqlite(rusqlite::Connection::open(path)?)
             }
             DbKind::Postgresql => {
-                let mut config = postgres::Config::new();
-                config
-                    .host(host(params))
-                    .port(port(params, kind)?)
-                    .dbname(param(params, "database"))
-                    .user(param(params, "user"))
-                    .password(param(params, "password"));
-                Connection::Postgresql(config.connect(postgres::NoTls).map_err(|e| e.to_string())?)
+                let mut pg = postgres::Config::new();
+                pg.host(config.host())
+                    .port(config.port()?)
+                    .dbname(config.param("database"))
+                    .user(config.param("user"))
+                    .password(config.param("password"));
+                Connection::Postgresql(pg.connect(postgres::NoTls)?)
             }
             DbKind::Mysql => {
-                let database = param(params, "database");
+                let database = config.param("database");
                 let opts = mysql::OptsBuilder::new()
-                    .ip_or_hostname(Some(host(params)))
-                    .tcp_port(port(params, kind)?)
+                    .ip_or_hostname(Some(config.host()))
+                    .tcp_port(config.port()?)
                     .db_name((!database.is_empty()).then_some(database))
-                    .user(Some(param(params, "user")))
-                    .pass(Some(param(params, "password")));
-                Connection::Mysql(mysql::Conn::new(opts).map_err(|e| e.to_string())?)
+                    .user(Some(config.param("user")))
+                    .pass(Some(config.param("password")));
+                Connection::Mysql(mysql::Conn::new(opts)?)
             }
         };
         self.conn = Some(conn);
         Ok(())
     }
 
-    pub fn is_connected(&self) -> bool {
+    fn is_connected(&self) -> bool {
         self.conn.is_some()
     }
 
-    pub fn kind(&self) -> Option<DbKind> {
+    fn kind(&self) -> Option<DbKind> {
         self.conn.as_ref().map(|c| match c {
             Connection::Sqlite(_) => DbKind::Sqlite,
             Connection::Postgresql(_) => DbKind::Postgresql,
@@ -113,16 +65,19 @@ impl DatabaseApi {
         })
     }
 
-    /// Runs a query and returns (column_names, rows), every value rendered as text.
-    pub fn execute(&mut self, sql: &str) -> Result<QueryResult, String> {
-        match self.conn.as_mut().ok_or("Not connected.")? {
-            Connection::Sqlite(c) => sqlite_execute(c, sql).map_err(|e| e.to_string()),
-            Connection::Postgresql(c) => postgres_execute(c, sql).map_err(|e| e.to_string()),
-            Connection::Mysql(c) => mysql_execute(c, sql).map_err(|e| e.to_string()),
+    fn execute(&mut self, sql: &str) -> DomainResult<QueryResult> {
+        match self
+            .conn
+            .as_mut()
+            .ok_or_else(|| DomainError::new("Not connected."))?
+        {
+            Connection::Sqlite(c) => Ok(sqlite_execute(c, sql)?),
+            Connection::Postgresql(c) => Ok(postgres_execute(c, sql)?),
+            Connection::Mysql(c) => Ok(mysql_execute(c, sql)?),
         }
     }
 
-    pub fn list_tables(&mut self) -> Result<Vec<String>, String> {
+    fn list_tables(&mut self) -> DomainResult<Vec<String>> {
         let sql = match self.kind() {
             None => return Ok(vec![]),
             Some(DbKind::Sqlite) => {
@@ -141,9 +96,7 @@ impl DatabaseApi {
             .collect())
     }
 
-    /// Returns [(column_name, column_type), ...] for a table already reported
-    /// by list_tables() (trusted, not free-typed user input).
-    pub fn list_columns(&mut self, table: &str) -> Result<Vec<(String, String)>, String> {
+    fn list_columns(&mut self, table: &str) -> DomainResult<Vec<(String, String)>> {
         let sql = match self.kind() {
             None => return Ok(vec![]),
             Some(DbKind::Sqlite) => format!("PRAGMA table_info('{}')", table.replace('\'', "''")),
@@ -169,7 +122,7 @@ impl DatabaseApi {
             .collect())
     }
 
-    pub fn close(&mut self) {
+    fn close(&mut self) {
         self.conn = None;
     }
 }
@@ -264,42 +217,4 @@ fn mysql_execute(conn: &mut mysql::Conn, sql: &str) -> mysql::Result<QueryResult
         }
     }
     Ok((columns, rows))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sqlite_tables_columns_and_rows() {
-        let mut db = DatabaseApi::default();
-        let params = ConnectionParams::from([("path", ":memory:".to_string())]);
-        db.connect(DbKind::Sqlite, &params).unwrap();
-        db.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, score REAL)")
-            .unwrap();
-        db.execute("INSERT INTO users (name, score) VALUES ('ann', 1.5), (NULL, 2)")
-            .unwrap();
-
-        assert_eq!(db.list_tables().unwrap(), vec!["users"]);
-        assert_eq!(
-            db.list_columns("users").unwrap(),
-            vec![
-                ("id".into(), "INTEGER".into()),
-                ("name".into(), "TEXT".into()),
-                ("score".into(), "REAL".into()),
-            ]
-        );
-        let (cols, rows) = db
-            .execute("SELECT name, score FROM users ORDER BY id")
-            .unwrap();
-        assert_eq!(cols, vec!["name", "score"]);
-        assert_eq!(
-            rows,
-            vec![
-                vec![Some("ann".into()), Some("1.5".into())],
-                vec![None, Some("2.0".into())]
-            ]
-        );
-        assert!(db.execute("SELECT nope").is_err());
-    }
 }

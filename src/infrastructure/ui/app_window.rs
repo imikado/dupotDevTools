@@ -4,8 +4,8 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
 
-use crate::domain::entity::FeatureEntity;
 use crate::infrastructure::service::feature_loader_service::FeatureLoaderService;
+use crate::infrastructure::ui::features::RegisteredFeature;
 
 use super::feature_detail_page;
 
@@ -211,14 +211,14 @@ fn tinted_texture(bytes: &'static [u8], size: i32, rgb: [u8; 3]) -> Option<gdk::
     )
 }
 
-fn feature_icon_bubble(feature: &FeatureEntity) -> gtk::Box {
+fn feature_icon_bubble(feature: &RegisteredFeature) -> gtk::Box {
     let image = match feature
         .icon
         .and_then(|b| tinted_texture(b, CARD_ICON_SIZE, [0xff, 0xff, 0xff]))
     {
         Some(texture) => gtk::Image::from_paintable(Some(&texture)),
         None => {
-            let img = gtk::Image::from_icon_name(section_icon(feature.section));
+            let img = gtk::Image::from_icon_name(section_icon(feature.entity.section));
             img.add_css_class("lightbox");
             img
         }
@@ -230,7 +230,7 @@ fn feature_icon_bubble(feature: &FeatureEntity) -> gtk::Box {
 
     let bubble = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     bubble.add_css_class("dt-icon-bubble");
-    bubble.add_css_class(&format!("dt-section-{}", feature.section));
+    bubble.add_css_class(&format!("dt-section-{}", feature.entity.section));
     bubble.set_halign(gtk::Align::Center);
     bubble.append(&image);
     bubble
@@ -279,7 +279,7 @@ impl MainWindow {
             split_view,
             content_bin: adw::Bin::new(),
             content_title: adw::WindowTitle::new("", ""),
-            loader: FeatureLoaderService::new(),
+            loader: FeatureLoaderService::default(),
             current_section: Cell::new(None),
             query: RefCell::default(),
         });
@@ -425,7 +425,7 @@ impl MainWindow {
         toolbar_view
     }
 
-    fn visible_features(&self) -> Vec<FeatureEntity> {
+    fn visible_features(&self) -> Vec<RegisteredFeature> {
         let query = self.query.borrow();
         if !query.is_empty() {
             return self
@@ -433,9 +433,10 @@ impl MainWindow {
                 .all_features()
                 .into_iter()
                 .filter(|f| {
-                    [f.title, f.description, f.name, &section_label(f.section)]
-                        .iter()
-                        .any(|s| s.to_lowercase().contains(query.as_str()))
+                    f.entity.matches(&query)
+                        || section_label(f.entity.section)
+                            .to_lowercase()
+                            .contains(query.as_str())
                 })
                 .collect();
         }
@@ -500,7 +501,7 @@ impl MainWindow {
         self.content_bin.set_child(Some(&scroll));
     }
 
-    fn build_feature_card(self: &Rc<Self>, feature: FeatureEntity) -> gtk::Button {
+    fn build_feature_card(self: &Rc<Self>, feature: RegisteredFeature) -> gtk::Button {
         let content = gtk::Box::new(gtk::Orientation::Vertical, 6);
         content.set_margin_top(20);
         content.set_margin_bottom(20);
@@ -512,14 +513,14 @@ impl MainWindow {
         bubble.set_margin_bottom(8);
 
         let name_lbl = gtk::Label::builder()
-            .label(feature.title)
+            .label(feature.entity.title)
             .wrap(true)
             .justify(gtk::Justification::Center)
             .build();
         name_lbl.add_css_class("heading");
 
         let desc_lbl = gtk::Label::builder()
-            .label(feature.description)
+            .label(feature.entity.description)
             .wrap(true)
             .justify(gtk::Justification::Center)
             .max_width_chars(24)
@@ -533,7 +534,7 @@ impl MainWindow {
 
         let button = gtk::Button::builder()
             .child(&content)
-            .tooltip_text(feature.description)
+            .tooltip_text(feature.entity.description)
             .width_request(180)
             .height_request(180)
             .build();
@@ -544,8 +545,10 @@ impl MainWindow {
         button.connect_clicked(move |_| {
             if let Some(this) = weak.upgrade() {
                 let instance = (feature.create)();
-                this.nav_view
-                    .push(&feature_detail_page::build(&feature, instance.as_ref()));
+                this.nav_view.push(&feature_detail_page::build(
+                    &feature.entity,
+                    instance.as_ref(),
+                ));
             }
         });
         button

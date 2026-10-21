@@ -1,8 +1,6 @@
-use crate::domain::contract::FeatureContract;
+use crate::domain::feature::convert::html_to_text;
+use crate::infrastructure::ui::feature_contract::FeatureContract;
 use crate::infrastructure::ui::shared::input_output_widget::{InputOutputWidget, Options};
-
-pub const TITLE: &str = "HTML to Text";
-pub const DESCRIPTION: &str = "Strip HTML tags to plain text";
 
 pub struct Feature;
 
@@ -14,10 +12,7 @@ impl FeatureContract for Feature {
             input_language: Some("html"),
             ..Default::default()
         });
-        tool.add_button("Convert", |t| {
-            let result = html2text::from_read(t.input().as_bytes(), 80).map_err(|e| e.to_string());
-            t.report(result);
-        });
+        tool.add_button("Convert", |t| t.report(html_to_text::convert(&t.input())));
         tool.into_widget()
     }
 }

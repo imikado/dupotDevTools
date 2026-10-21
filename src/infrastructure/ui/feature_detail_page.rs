@@ -1,7 +1,7 @@
 use adw::prelude::*;
 
-use crate::domain::contract::FeatureContract;
-use crate::domain::entity::FeatureEntity;
+use crate::domain::entity::feature_entity::FeatureEntity;
+use crate::infrastructure::ui::feature_contract::FeatureContract;
 
 pub fn build(entity: &FeatureEntity, feature: &dyn FeatureContract) -> adw::NavigationPage {
     let header_bar = adw::HeaderBar::new();

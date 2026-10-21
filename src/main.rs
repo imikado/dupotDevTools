@@ -1,11 +1,8 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
-mod domain;
-mod infrastructure;
-
 use adw::prelude::*;
+use dupot_dev_tools::infrastructure::ui::app_window;
 
 fn main() -> gtk::glib::ExitCode {
-    let app = infrastructure::ui::app_window::build_application();
-    app.run()
+    app_window::build_application().run()
 }

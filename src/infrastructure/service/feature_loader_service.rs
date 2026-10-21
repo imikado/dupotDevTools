@@ -1,31 +1,36 @@
-use crate::domain::entity::FeatureEntity;
-use crate::infrastructure::ui::features;
+use crate::infrastructure::ui::features::{self, RegisteredFeature};
 
+/// The tool catalog, sorted by section then name.
 pub struct FeatureLoaderService {
-    features: Vec<FeatureEntity>,
+    features: Vec<RegisteredFeature>,
+}
+
+impl Default for FeatureLoaderService {
+    fn default() -> Self {
+        Self::new(features::registry())
+    }
 }
 
 impl FeatureLoaderService {
-    pub fn new() -> Self {
-        let mut features = features::registry();
-        features.sort_by(|a, b| (a.section, a.name).cmp(&(b.section, b.name)));
+    pub fn new(mut features: Vec<RegisteredFeature>) -> Self {
+        features.sort_by_key(|f| (f.entity.section, f.entity.name));
         Self { features }
     }
 
     pub fn sections(&self) -> Vec<&'static str> {
-        let mut sections: Vec<_> = self.features.iter().map(|f| f.section).collect();
+        let mut sections: Vec<_> = self.features.iter().map(|f| f.entity.section).collect();
         sections.dedup();
         sections
     }
 
-    pub fn all_features(&self) -> Vec<FeatureEntity> {
+    pub fn all_features(&self) -> Vec<RegisteredFeature> {
         self.features.clone()
     }
 
-    pub fn features_in_section(&self, section: &str) -> Vec<FeatureEntity> {
+    pub fn features_in_section(&self, section: &str) -> Vec<RegisteredFeature> {
         self.features
             .iter()
-            .filter(|f| f.section == section)
+            .filter(|f| f.entity.section == section)
             .cloned()
             .collect()
     }

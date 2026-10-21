@@ -1,7 +1,14 @@
-//! Every tool lives in `<section>/<name>/` (a `mod.rs` + `icon.png`) and is
-//! listed once in `registry()`. A new section folder = a new sidebar entry.
+//! Every tool is split in two mirrored modules:
+//! - `domain::feature::<section>::<name>`: its `ENTITY` and pure logic;
+//! - `infrastructure::ui::features::<section>::<name>/`: its view (`mod.rs`)
+//!   and `icon.png`.
+//!
+//! and listed once in `registry()`.
 
-use crate::domain::entity::FeatureEntity;
+use crate::domain::entity::feature_entity::FeatureEntity;
+use crate::domain::feature;
+
+use super::feature_contract::FeatureContract;
 
 pub mod convert;
 pub mod database;
@@ -9,13 +16,18 @@ pub mod encoding;
 pub mod formating;
 pub mod string;
 
+/// A tool as shown by the UI: its domain entity, icon and view factory.
+#[derive(Clone)]
+pub struct RegisteredFeature {
+    pub entity: FeatureEntity,
+    pub icon: Option<&'static [u8]>,
+    pub create: fn() -> Box<dyn FeatureContract>,
+}
+
 macro_rules! feature {
     ($section:ident :: $name:ident) => {
-        FeatureEntity {
-            name: stringify!($name),
-            title: $section::$name::TITLE,
-            description: $section::$name::DESCRIPTION,
-            section: stringify!($section),
+        RegisteredFeature {
+            entity: feature::$section::$name::ENTITY,
             icon: Some(include_bytes!(concat!(
                 stringify!($section),
                 "/",
@@ -27,7 +39,7 @@ macro_rules! feature {
     };
 }
 
-pub fn registry() -> Vec<FeatureEntity> {
+pub fn registry() -> Vec<RegisteredFeature> {
     vec![
         feature!(convert::html_to_text),
         feature!(convert::yaml_json),

@@ -1,18 +1,22 @@
+pub mod geometry;
+
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
 use std::rc::Rc;
 
 use adw::prelude::*;
 use gtk::{gdk, gio, glib, graphene};
 
-use crate::domain::contract::FeatureContract;
-use crate::infrastructure::api::database_api::{self, ConnectionParams, DatabaseApi, DbKind};
+use self::geometry::{facing_edge_x, hit_test, link_curve};
+use crate::domain::contract::database_repository::DatabaseRepository;
+use crate::domain::entity::database::{ConnectionConfig, ConnectionForm, DbKind, QueryResult};
+use crate::domain::error::DomainResult;
+use crate::domain::feature::database::sql_viewer::{
+    self as logic, CanvasJoin, CanvasTable, MAX_RESULT_ROWS,
+};
+use crate::infrastructure::api::database_api::DatabaseApi;
+use crate::infrastructure::ui::feature_contract::FeatureContract;
 use crate::infrastructure::ui::shared::input_output_widget::timestamp;
 
-pub const TITLE: &str = "SQL Viewer";
-pub const DESCRIPTION: &str = "Browse database tables on an interactive canvas";
-
-const MAX_RESULT_ROWS: usize = 200;
 const LINK_COLOR: (f64, f64, f64) = (0.22, 0.51, 0.89);
 
 pub struct Feature;
@@ -25,12 +29,6 @@ impl FeatureContract for Feature {
     fn widget(&self) -> gtk::Widget {
         SqlViewer::build()
     }
-}
-
-struct ConnectionConfig {
-    name: String,
-    kind: DbKind,
-    params: ConnectionParams,
 }
 
 struct ColumnWidgets {
@@ -66,14 +64,14 @@ struct Hitbox {
 /// to it; the root widget's destroy handler owns the only strong reference,
 /// so leaving the page drops everything, including the DB connection.
 struct SqlViewer {
-    db: RefCell<DatabaseApi>,
+    db: RefCell<Box<dyn DatabaseRepository>>,
     connections: RefCell<Vec<ConnectionConfig>>,
     tables_cache: RefCell<Vec<String>>,
     table_cards: RefCell<Vec<Rc<TableCard>>>,
     joins: RefCell<Vec<Rc<Join>>>,
     pending_link: RefCell<Option<Side>>,
     link_hitboxes: RefCell<Vec<Hitbox>>,
-    last_result: RefCell<database_api::QueryResult>,
+    last_result: RefCell<QueryResult>,
 
     conn_model: gtk::StringList,
     conn_dropdown: gtk::DropDown,
@@ -129,20 +127,6 @@ fn popover_at(parent: &impl IsA<gtk::Widget>, x: f64, y: f64) -> gtk::Popover {
     popover
 }
 
-fn bezier_point(p: &[(f64, f64); 4], t: f64) -> (f64, f64) {
-    let mt = 1.0 - t;
-    let (a, b, c, d) = (
-        mt.powi(3),
-        3.0 * mt.powi(2) * t,
-        3.0 * mt * t.powi(2),
-        t.powi(3),
-    );
-    (
-        a * p[0].0 + b * p[1].0 + c * p[2].0 + d * p[3].0,
-        a * p[0].1 + b * p[1].1 + c * p[2].1 + d * p[3].1,
-    )
-}
-
 /// Connects at the vertical height of the linked column, but always on the
 /// frame edge that faces the other table — so the line hugs the outside of
 /// both cards instead of cutting across whichever one sits in between.
@@ -158,14 +142,11 @@ fn edge_point(
     )?;
     let f = frame.compute_point(target, &graphene::Point::zero())?;
     let ff = facing.compute_point(target, &graphene::Point::zero())?;
-    let own_center = f.x() + frame.width() as f32 / 2.0;
-    let facing_center = ff.x() + facing.width() as f32 / 2.0;
-    let edge_x = if own_center <= facing_center {
-        f.x() + frame.width() as f32
-    } else {
-        f.x()
-    };
-    Some((edge_x as f64, a.y() as f64))
+    let edge_x = facing_edge_x(
+        (f.x() as f64, frame.width() as f64),
+        (ff.x() as f64, facing.width() as f64),
+    );
+    Some((edge_x, a.y() as f64))
 }
 
 macro_rules! with_viewer {
@@ -313,7 +294,7 @@ impl SqlViewer {
         root.append(&results_scroll);
 
         let this = Rc::new(Self {
-            db: RefCell::default(),
+            db: RefCell::new(Box::new(DatabaseApi::default())),
             connections: RefCell::default(),
             tables_cache: RefCell::default(),
             table_cards: RefCell::default(),
@@ -406,40 +387,30 @@ impl SqlViewer {
             let (l, rt) = (&join.left, &join.right);
             let p1 = edge_point(&self.link_lines, &l.anchor, &l.card.frame, &rt.card.frame);
             let p2 = edge_point(&self.link_lines, &rt.anchor, &rt.card.frame, &l.card.frame);
-            let (Some((x1, y1)), Some((x2, y2))) = (p1, p2) else {
+            let (Some(from), Some(to)) = (p1, p2) else {
                 continue;
             };
-            let mid = (x1 + x2) / 2.0;
+            let [p0, c1, c2, p3] = link_curve(from, to);
             cr.set_source_rgba(r, g, b, 0.9);
             cr.set_line_width(2.0);
-            cr.move_to(x1, y1);
-            cr.curve_to(mid, y1, mid, y2, x2, y2);
+            cr.move_to(p0.0, p0.1);
+            cr.curve_to(c1.0, c1.1, c2.0, c2.1, p3.0, p3.1);
             let _ = cr.stroke();
-            for (px, py) in [(x1, y1), (x2, y2)] {
+            for (px, py) in [p0, p3] {
                 cr.arc(px, py, 3.5, 0.0, std::f64::consts::TAU);
                 let _ = cr.fill();
             }
             hitboxes.push(Hitbox {
                 join: Rc::clone(join),
-                points: [(x1, y1), (mid, y1), (mid, y2), (x2, y2)],
+                points: [p0, c1, c2, p3],
             });
         }
     }
 
     fn find_join_at(&self, x: f64, y: f64, tolerance: f64) -> Option<Rc<Join>> {
-        let mut best = None;
-        let mut best_dist = tolerance;
-        for hb in self.link_hitboxes.borrow().iter() {
-            for i in 0..=20 {
-                let (px, py) = bezier_point(&hb.points, i as f64 / 20.0);
-                let dist = ((px - x).powi(2) + (py - y).powi(2)).sqrt();
-                if dist < best_dist {
-                    best_dist = dist;
-                    best = Some(Rc::clone(&hb.join));
-                }
-            }
-        }
-        best
+        let hitboxes = self.link_hitboxes.borrow();
+        let curves: Vec<_> = hitboxes.iter().map(|hb| hb.points).collect();
+        hit_test(&curves, x, y, tolerance).map(|i| Rc::clone(&hitboxes[i].join))
     }
 
     // --- Joins panel ---
@@ -748,7 +719,7 @@ impl SqlViewer {
     fn add_table_card(self: &Rc<Self>, table: &str, x: f64, y: f64) {
         let columns = match self.db.borrow_mut().list_columns(table) {
             Ok(c) => c,
-            Err(e) => return self.set_error(&e),
+            Err(e) => return self.set_error(e.message()),
         };
         let card = self.build_table_card(table, &columns);
         self.fixed.put(&card.frame, x, y);
@@ -905,90 +876,37 @@ impl SqlViewer {
 
     // --- Query building / execution ---
 
-    fn quote_ident(&self, name: &str) -> String {
-        if self.db.borrow().kind() == Some(DbKind::Mysql) {
-            format!("`{}`", name.replace('`', "``"))
-        } else {
-            format!("\"{}\"", name.replace('"', "\"\""))
-        }
-    }
-
-    fn build_query(&self) -> Result<String, String> {
+    /// Snapshot of the canvas as the domain's query model.
+    fn build_query(&self) -> DomainResult<String> {
         let cards = self.table_cards.borrow();
-        if cards.is_empty() {
-            return Err("Add at least one table to the canvas first.".into());
-        }
-        let alias = |card: &Rc<TableCard>| {
-            let i = cards.iter().position(|c| Rc::ptr_eq(c, card)).unwrap_or(0);
-            format!("t{}", i + 1)
-        };
-
-        let mut select_parts = Vec::new();
-        for card in cards.iter() {
-            let a = alias(card);
-            for col in card.columns.iter().filter(|c| c.check.is_active()) {
-                select_parts.push(format!(
-                    "{a}.{} AS \"{a}_{}\"",
-                    self.quote_ident(&col.name),
-                    col.name.replace('"', "\"\"")
-                ));
-            }
-        }
-        if select_parts.is_empty() {
-            return Err("Check at least one column to select.".into());
-        }
-
-        let base = &cards[0];
-        let from_clause = format!("{} AS {}", self.quote_ident(&base.table), alias(base));
-
-        let mut joined: HashSet<*const TableCard> = HashSet::from([Rc::as_ptr(base)]);
-        let mut remaining: Vec<Rc<Join>> = self.joins.borrow().clone();
-        let mut join_clauses = Vec::new();
-        let mut progress = true;
-        while !remaining.is_empty() && progress {
-            progress = false;
-            remaining.retain(|join| {
-                let has_left = joined.contains(&Rc::as_ptr(&join.left.card));
-                let has_right = joined.contains(&Rc::as_ptr(&join.right.card));
-                let (old, new) = match (has_left, has_right) {
-                    (true, false) => (&join.left, &join.right),
-                    (false, true) => (&join.right, &join.left),
-                    _ => return true,
-                };
-                join_clauses.push(format!(
-                    "INNER JOIN {} AS {} ON {}.{} = {}.{}",
-                    self.quote_ident(&new.card.table),
-                    alias(&new.card),
-                    alias(&old.card),
-                    self.quote_ident(&old.col),
-                    alias(&new.card),
-                    self.quote_ident(&new.col),
-                ));
-                joined.insert(Rc::as_ptr(&new.card));
-                progress = true;
-                false
-            });
-        }
-
-        let unreached: Vec<&str> = cards
+        let index_of = |card: &Rc<TableCard>| cards.iter().position(|c| Rc::ptr_eq(c, card));
+        let tables: Vec<CanvasTable> = cards
             .iter()
-            .filter(|c| !joined.contains(&Rc::as_ptr(c)))
-            .map(|c| c.table.as_str())
+            .map(|card| CanvasTable {
+                table: card.table.clone(),
+                selected_columns: card
+                    .columns
+                    .iter()
+                    .filter(|c| c.check.is_active())
+                    .map(|c| c.name.clone())
+                    .collect(),
+            })
             .collect();
-        if !unreached.is_empty() {
-            return Err(format!(
-                "Link a column to connect: {}",
-                unreached.join(", ")
-            ));
-        }
-
-        let mut sql = format!("SELECT {} FROM {from_clause}", select_parts.join(", "));
-        if !join_clauses.is_empty() {
-            sql.push(' ');
-            sql.push_str(&join_clauses.join(" "));
-        }
-        sql.push_str(&format!(" LIMIT {MAX_RESULT_ROWS}"));
-        Ok(sql)
+        let joins: Vec<CanvasJoin> = self
+            .joins
+            .borrow()
+            .iter()
+            .filter_map(|j| {
+                Some(CanvasJoin {
+                    left_table: index_of(&j.left.card)?,
+                    left_column: j.left.col.clone(),
+                    right_table: index_of(&j.right.card)?,
+                    right_column: j.right.col.clone(),
+                })
+            })
+            .collect();
+        let kind = self.db.borrow().kind().unwrap_or(DbKind::Sqlite);
+        logic::build_select(kind, &tables, &joins, MAX_RESULT_ROWS)
     }
 
     fn do_generate_sql(&self) {
@@ -997,7 +915,7 @@ impl SqlViewer {
                 self.sql_buffer.set_text(&sql);
                 self.set_status("SQL generated from the canvas — edit it, then Run Query.");
             }
-            Err(e) => self.set_error(&e),
+            Err(e) => self.set_error(e.message()),
         }
     }
 
@@ -1011,25 +929,25 @@ impl SqlViewer {
                     self.sql_buffer.set_text(&built);
                     sql = built;
                 }
-                Err(e) => return self.set_error(&e),
+                Err(e) => return self.set_error(e.message()),
             }
         }
         let result = self.db.borrow_mut().execute(&sql);
         let (columns, rows) = match result {
             Ok(r) => r,
-            Err(e) => return self.set_error(&e),
+            Err(e) => return self.set_error(e.message()),
         };
-        let truncated = if rows.len() == MAX_RESULT_ROWS {
+        let truncated = if logic::is_truncated(rows.len()) {
             " (truncated)"
         } else {
             ""
         };
         let status = format!("{} row(s){truncated} — {}", rows.len(), timestamp());
-        self.render_results(columns, rows);
+        self.render_results((columns, rows));
         self.set_status(&status);
     }
 
-    fn render_results(&self, columns: Vec<String>, rows: Vec<Vec<database_api::Cell>>) {
+    fn render_results(&self, (columns, rows): QueryResult) {
         self.export_csv_btn.set_sensitive(!columns.is_empty());
         if columns.is_empty() {
             self.results_scroll
@@ -1082,21 +1000,14 @@ impl SqlViewer {
             let Some(path) = file.path() else { return };
             match this.write_csv(&path) {
                 Ok(n) => this.set_status(&format!("Exported {n} row(s) to {}", path.display())),
-                Err(e) => this.set_error(&e),
+                Err(e) => this.set_error(e.message()),
             }
         });
     }
 
-    fn write_csv(&self, path: &std::path::Path) -> Result<usize, String> {
+    fn write_csv(&self, path: &std::path::Path) -> DomainResult<usize> {
         let (columns, rows) = &*self.last_result.borrow();
-        let mut writer = csv::Writer::from_path(path).map_err(|e| e.to_string())?;
-        writer.write_record(columns).map_err(|e| e.to_string())?;
-        for row in rows {
-            writer
-                .write_record(row.iter().map(|v| v.as_deref().unwrap_or("")))
-                .map_err(|e| e.to_string())?;
-        }
-        writer.flush().map_err(|e| e.to_string())?;
+        std::fs::write(path, logic::to_csv(columns, rows)?)?;
         Ok(rows.len())
     }
 
@@ -1109,9 +1020,7 @@ impl SqlViewer {
             return self.set_error("Create a connection first.");
         };
         let mut db = self.db.borrow_mut();
-        let tables = db
-            .connect(cfg.kind, &cfg.params)
-            .and_then(|_| db.list_tables());
+        let tables = db.connect(cfg).and_then(|_| db.list_tables());
         drop(db);
         match tables {
             Ok(tables) => {
@@ -1122,7 +1031,7 @@ impl SqlViewer {
                     cfg.name
                 ));
             }
-            Err(e) => self.set_error(&e),
+            Err(e) => self.set_error(e.message()),
         }
     }
 
@@ -1240,38 +1149,31 @@ impl SqlViewer {
             move |_| {
                 let Some(this) = weak.upgrade() else { return };
                 let kind = selected_kind(&type_row);
-                let mut name = name_row.text().trim().to_string();
-                if name.is_empty() {
-                    name = format!("connection-{}", this.connections.borrow().len() + 1);
-                }
-
-                let mut params = ConnectionParams::new();
-                if kind == DbKind::Sqlite {
-                    let path = path_row.text().trim().to_string();
-                    if path.is_empty() {
+                let form = ConnectionForm {
+                    name: name_row.text().into(),
+                    path: path_row.text().into(),
+                    host: host_row.text().into(),
+                    port: port_row.text().into(),
+                    database: database_row.text().into(),
+                    user: user_row.text().into(),
+                    password: password_row.text().into(),
+                };
+                let existing = this.connections.borrow().len();
+                let config = match form.into_config(kind, existing) {
+                    Ok(config) => config,
+                    Err(_) => {
+                        // The only validation rule: SQLite needs a file path.
                         path_row.add_css_class("error");
                         return;
                     }
-                    params.insert("path", path);
-                } else {
-                    let or = |v: String, d: &str| if v.is_empty() { d.to_string() } else { v };
-                    params.insert("host", or(host_row.text().trim().into(), "localhost"));
-                    params.insert(
-                        "port",
-                        or(port_row.text().trim().into(), kind.default_port()),
-                    );
-                    params.insert("database", database_row.text().trim().into());
-                    params.insert("user", user_row.text().trim().into());
-                    params.insert("password", password_row.text().into());
-                }
+                };
+                let name = config.name.clone();
 
                 this.conn_model.append(&name);
                 this.set_status(&format!(
                     "Connection “{name}” created. Click Connect to use it."
                 ));
-                this.connections
-                    .borrow_mut()
-                    .push(ConnectionConfig { name, kind, params });
+                this.connections.borrow_mut().push(config);
                 this.conn_dropdown
                     .set_selected(this.conn_model.n_items() - 1);
                 this.conn_dropdown.set_sensitive(true);
