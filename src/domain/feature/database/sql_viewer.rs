@@ -65,7 +65,14 @@ pub struct ColumnCriteria {
 
 const FILTER_OPERATORS: [&str; 7] = ["<>", "!=", "<=", ">=", "=", "<", ">"];
 const FILTER_KEYWORDS: [&str; 8] = [
-    "LIKE ", "NOT LIKE ", "ILIKE ", "NOT ILIKE ", "IN ", "IN(", "NOT IN", "IS ",
+    "LIKE ",
+    "NOT LIKE ",
+    "ILIKE ",
+    "NOT ILIKE ",
+    "IN ",
+    "IN(",
+    "NOT IN",
+    "IS ",
 ];
 
 /// `column <condition>` for a criteria filter cell (see `ColumnCriteria::filter`).
@@ -137,7 +144,11 @@ pub fn build_select(
                     Some(c) if !c.alias.trim().is_empty() => c.alias.trim().to_string(),
                     _ => format!("{}_{col}", alias(i)),
                 };
-                format!("{} AS \"{}\"", column_ref(i, col), name.replace('"', "\"\""))
+                format!(
+                    "{} AS \"{}\"",
+                    column_ref(i, col),
+                    name.replace('"', "\"\"")
+                )
             })
         })
         .collect();
@@ -351,7 +362,10 @@ pub fn parse_select(kind: DbKind, sql: &str) -> DomainResult<ParsedSelect> {
         let mut previous = reader.add_table(&from.relation).ok_or_else(not_drawable)?;
         for join in &from.joins {
             let index = reader.add_table(&join.relation).ok_or_else(not_drawable)?;
-            if !matches!(join.join_operator, JoinOperator::Join(_) | JoinOperator::Inner(_)) {
+            if !matches!(
+                join.join_operator,
+                JoinOperator::Join(_) | JoinOperator::Inner(_)
+            ) {
                 // Drawn, but rebuilt as an INNER JOIN.
                 reader.parsed.complete = false;
             }

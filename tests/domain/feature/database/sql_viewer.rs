@@ -28,7 +28,14 @@ fn quote_ident_per_dialect() {
 
 #[test]
 fn single_table() {
-    let sql = build_select(DbKind::Sqlite, &[table("users", &["id", "name"])], &[], 200).unwrap();
+    let sql = build_select(
+        DbKind::Sqlite,
+        &[table("users", &["id", "name"])],
+        &[],
+        &[],
+        200,
+    )
+    .unwrap();
     assert_eq!(
         sql,
         "SELECT t1.\"id\" AS \"t1_id\", t1.\"name\" AS \"t1_name\" FROM \"users\" AS t1 LIMIT 200"
@@ -44,7 +51,7 @@ fn joins_are_ordered_from_the_first_table() {
         table("items", &["sku"]),
     ];
     let joins = [join(2, "order_id", 1, "id"), join(1, "user_id", 0, "id")];
-    let sql = build_select(DbKind::Mysql, &tables, &joins, 10).unwrap();
+    let sql = build_select(DbKind::Mysql, &tables, &joins, &[], 10).unwrap();
     assert_eq!(
         sql,
         "SELECT t1.`name` AS \"t1_name\", t3.`sku` AS \"t3_sku\" FROM `users` AS t1 \
@@ -55,13 +62,13 @@ fn joins_are_ordered_from_the_first_table() {
 
 #[test]
 fn no_table_is_an_error() {
-    let err = build_select(DbKind::Sqlite, &[], &[], 200).unwrap_err();
+    let err = build_select(DbKind::Sqlite, &[], &[], &[], 200).unwrap_err();
     assert_eq!(err.message(), "Add at least one table to the canvas first.");
 }
 
 #[test]
 fn no_selected_column_is_an_error() {
-    let err = build_select(DbKind::Sqlite, &[table("users", &[])], &[], 200).unwrap_err();
+    let err = build_select(DbKind::Sqlite, &[table("users", &[])], &[], &[], 200).unwrap_err();
     assert_eq!(err.message(), "Check at least one column to select.");
 }
 
@@ -72,7 +79,7 @@ fn unlinked_tables_are_reported() {
         table("logs", &["id"]),
         table("tags", &[]),
     ];
-    let err = build_select(DbKind::Sqlite, &tables, &[], 200).unwrap_err();
+    let err = build_select(DbKind::Sqlite, &tables, &[], &[], 200).unwrap_err();
     assert_eq!(err.message(), "Link a column to connect: logs, tags");
 }
 
@@ -199,8 +206,8 @@ mod parsing {
         assert_eq!(
             parsed.joins,
             [
-                join(1, "author_id", 0, "id"),
-                join(1, "book_id", 2, "book_id")
+                join(1, "book_id", 2, "book_id"),
+                join(1, "author_id", 0, "id")
             ]
         );
     }
@@ -219,7 +226,7 @@ mod parsing {
         ];
         let joins = [join(1, "author_id", 0, "id")];
         for kind in DbKind::ALL {
-            let sql = build_select(kind, &tables, &joins, MAX_RESULT_ROWS).unwrap();
+            let sql = build_select(kind, &tables, &joins, &[], MAX_RESULT_ROWS).unwrap();
             let parsed = parse_select(kind, &sql).unwrap();
             assert_eq!(
                 parsed.tables[1].columns,
@@ -240,5 +247,133 @@ mod parsing {
         ] {
             assert!(parse_select(DbKind::Postgresql, sql).is_err(), "{sql}");
         }
+    }
+}
+
+mod criteria {
+    use dupot_dev_tools::domain::entity::database::DbKind;
+    use dupot_dev_tools::domain::feature::database::sql_viewer::{
+        CanvasJoin, CanvasTable, ColumnCriteria, MAX_RESULT_ROWS, SortDirection, build_select,
+        filter_condition, parse_select,
+    };
+
+    #[test]
+    fn filter_cells_become_conditions() {
+        let col = "t1.\"c\"";
+        assert_eq!(filter_condition(col, "> 8"), "t1.\"c\" > 8");
+        assert_eq!(filter_condition(col, " like 'A%'"), "t1.\"c\" like 'A%'");
+        assert_eq!(filter_condition(col, "IS NULL"), "t1.\"c\" IS NULL");
+        assert_eq!(filter_condition(col, "IN (1, 2)"), "t1.\"c\" IN (1, 2)");
+        assert_eq!(filter_condition(col, "12.5"), "t1.\"c\" = 12.5");
+        assert_eq!(filter_condition(col, "'x'"), "t1.\"c\" = 'x'");
+        assert_eq!(filter_condition(col, "O'Neil"), "t1.\"c\" = 'O''Neil'");
+    }
+
+    fn designer() -> (Vec<CanvasTable>, Vec<CanvasJoin>, Vec<ColumnCriteria>) {
+        let tables = vec![
+            CanvasTable {
+                table: "author".into(),
+                selected_columns: vec!["name".into()],
+            },
+            CanvasTable {
+                table: "book".into(),
+                selected_columns: vec!["title".into(), "price".into()],
+            },
+        ];
+        let joins = vec![CanvasJoin {
+            left_table: 1,
+            left_column: "author_id".into(),
+            right_table: 0,
+            right_column: "id".into(),
+        }];
+        let criteria = vec![
+            ColumnCriteria {
+                table: 0,
+                column: "name".into(),
+                alias: "author".into(),
+                sort: Some(SortDirection::Ascending),
+                sort_order: 2,
+                ..Default::default()
+            },
+            ColumnCriteria {
+                table: 1,
+                column: "price".into(),
+                sort: Some(SortDirection::Descending),
+                sort_order: 1,
+                filter: "> 8".into(),
+                or_filter: "IS NULL".into(),
+                ..Default::default()
+            },
+            ColumnCriteria {
+                table: 0,
+                column: "country".into(),
+                filter: "France".into(),
+                ..Default::default()
+            },
+        ];
+        (tables, joins, criteria)
+    }
+
+    #[test]
+    fn builds_alias_where_and_order_by() {
+        let (tables, joins, criteria) = designer();
+        let sql = build_select(DbKind::Postgresql, &tables, &joins, &criteria, 50).unwrap();
+        assert_eq!(
+            sql,
+            "SELECT t1.\"name\" AS \"author\", t2.\"title\" AS \"t2_title\", \
+             t2.\"price\" AS \"t2_price\" FROM \"author\" AS t1 \
+             INNER JOIN \"book\" AS t2 ON t1.\"id\" = t2.\"author_id\" \
+             WHERE (t2.\"price\" > 8 AND t1.\"country\" = 'France') OR (t2.\"price\" IS NULL) \
+             ORDER BY t2.\"price\" DESC, t1.\"name\" ASC LIMIT 50"
+        );
+    }
+
+    #[test]
+    fn criteria_round_trip_through_sql() {
+        let (tables, joins, criteria) = designer();
+        for kind in DbKind::ALL {
+            let sql = build_select(kind, &tables, &joins, &criteria, MAX_RESULT_ROWS).unwrap();
+            let parsed = parse_select(kind, &sql).unwrap();
+            assert!(parsed.complete, "{kind:?}: {sql}");
+            let find = |table: usize, column: &str| {
+                parsed
+                    .criteria
+                    .iter()
+                    .find(|c| c.table == table && c.column == column)
+                    .cloned()
+                    .unwrap_or_default()
+            };
+            let name = find(0, "name");
+            assert_eq!(name.alias, "author");
+            assert_eq!(
+                (name.sort, name.sort_order),
+                (Some(SortDirection::Ascending), 2)
+            );
+            let price = find(1, "price");
+            assert_eq!(price.filter, "> 8");
+            assert_eq!(price.or_filter, "IS NULL");
+            assert_eq!(
+                (price.sort, price.sort_order),
+                (Some(SortDirection::Descending), 1)
+            );
+            assert_eq!(find(0, "country").filter, "= 'France'");
+        }
+    }
+
+    #[test]
+    fn unsupported_clauses_are_incomplete() {
+        for sql in [
+            "SELECT a.name FROM author a GROUP BY a.name",
+            "SELECT DISTINCT a.name FROM author a",
+            "SELECT count(a.id) FROM author a",
+            "SELECT a.name FROM author a LEFT JOIN book b ON b.author_id = a.id",
+            "SELECT a.name FROM author a WHERE a.id > 1 AND a.id < 5",
+            "SELECT a.name FROM author a LIMIT 10",
+        ] {
+            let parsed = parse_select(DbKind::Postgresql, sql).unwrap();
+            assert!(!parsed.complete, "{sql}");
+        }
+        let simple = parse_select(DbKind::Postgresql, "SELECT name FROM author WHERE id > 1");
+        assert!(simple.unwrap().complete);
     }
 }

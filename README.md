@@ -36,7 +36,7 @@ Dupot Dev Tools gathers all those small everyday utilities in **one desktop app*
 
 | Category | Tool | What it does |
 |---|---|---|
-| 🗄️ **Database** | **SQL Viewer** | Browse SQLite, PostgreSQL and MySQL databases on an interactive canvas |
+| 🗄️ **Database** | **SQL Viewer** | Visual query designer for SQLite, PostgreSQL and MySQL: canvas, criteria grid, SQL and results |
 | 🎨 **Formatting** | JSON Formatter | Prettify or minify JSON |
 | | SQL Formatter | Format SQL queries |
 | | XML Formatter | Format XML documents |
@@ -57,13 +57,16 @@ Every text tool shares the same layout: syntax-highlighted input and output side
 
 ## 🗄️ Spotlight: SQL Viewer
 
-A visual query builder that lets you understand a database at a glance:
+A visual query designer, in the spirit of SQL Server Management Studio, to understand a database at a glance:
 
 - **Connect** to SQLite, PostgreSQL and MySQL (drivers built in, nothing else to install)
-- **Drop tables onto a canvas** as movable, resizable cards
-- **Draw joins** by linking columns between tables; click a line to edit or remove it
-- **Pick the columns** you want and get the SQL query generated for you, then edit it freely
-- **Run it**, browse the results and **export them to CSV**
+- **Save your connections** to a JSON file and reopen them (the last file reopens at startup). Passwords are never written: they are asked once per session
+- **Drop tables onto a canvas** as movable, resizable cards showing every column, its type and its foreign keys
+- **Joins are drawn for you** from the foreign keys; link two columns yourself or click a line to edit or remove it
+- **Criteria grid**: per column, set an alias, output, sort (with sort order) and filters: `> 8`, `LIKE 'A%'`, `IS NULL` or a plain value. Rows must match every *Filter* or every *Or…*
+- **The SQL follows the canvas and the grid** until you edit it by hand. Type or paste a `SELECT` and it is drawn back on the canvas and in the grid
+- **Run it** (Ctrl+Enter), browse the results and **export them to CSV**
+- **Four resizable panes**: *Diagram*, *Criteria*, *SQL* and *Results*, each one can be shown or hidden from the toolbar
 
 | New connection | Add a table | Query result |
 |---|---|---|
@@ -75,7 +78,7 @@ A visual query builder that lets you understand a database at a glance:
 |---|---|
 | Language | Rust (2024 edition) |
 | UI | GTK 4 + Libadwaita via [gtk-rs](https://gtk-rs.org), GtkSourceView 5 for code editors |
-| Databases | `rusqlite` (bundled SQLite), `postgres`, `mysql` (pure-Rust, no client libraries needed) |
+| Databases | `rusqlite` (bundled SQLite), `postgres`, `mysql` (pure-Rust, no client libraries needed), `sqlparser` (reads typed queries back onto the canvas) |
 | Formats | `serde_json`, `serde_yaml_ng`, `quick-xml`, `sqlformat`, `html2text`, `csv` |
 | Text & time | `regex`, `similar` (diff), `chrono`, `croner` (cron), `uuid`, `ulid` |
 | Encoding / crypto | `base64`, `percent-encoding`, `html-escape`, RustCrypto (`md-5`, `sha1`, `sha2`, `sha3`, `blake2`) |
@@ -129,6 +132,18 @@ cargo clippy --all-targets
 
 All of these go through [`.vscode/nix-cargo.sh`](.vscode/nix-cargo.sh) and [`.vscode/rust-analyzer.sh`](.vscode/rust-analyzer.sh).
 
+### Test database for the SQL Viewer
+
+[`examples/postgresql/`](examples/postgresql/) builds a PostgreSQL 16 server with two tables linked by a foreign key (`book.author_id` → `author.id`) and sample rows:
+
+```bash
+cd examples/postgresql
+docker build -t dupot-pg-example .
+docker run --rm -d --name dupot-pg -p 5432:5432 dupot-pg-example
+```
+
+Connect with host `localhost`, port `5432`, and `devtools` as database, user and password. Stop it with `docker stop dupot-pg`.
+
 ## 📦 Packaging
 
 Every package is built from Linux with one command:
@@ -172,15 +187,15 @@ src/
 ├── domain/                              # pure Rust: no GTK, no I/O
 │   ├── error.rs                         # DomainError (any library error converts with `?`)
 │   ├── entity/                          # FeatureEntity, database types, connection form
-│   ├── contract/                        # DatabaseRepository (implemented by infrastructure)
+│   ├── contract/                        # DatabaseRepository, ConnectionRepository (implemented by infrastructure)
 │   ├── shared/                          # helpers shared by tools (pretty JSON…)
 │   └── feature/<category>/<tool>.rs     # each tool's ENTITY (metadata) + logic
 └── infrastructure/
-    ├── api/                             # SQLite / PostgreSQL / MySQL DatabaseRepository
+    ├── api/                             # SQLite / PostgreSQL / MySQL DatabaseRepository, connections JSON store
     ├── service/                         # tool catalog (sorting, sections)
     └── ui/                              # GTK / Libadwaita
         ├── app_window.rs                # sidebar, search, tool cards
-        ├── feature_contract.rs          # trait every tool view implements
+        ├── feature_contract.rs          # trait every tool view implements (+ optional leave guard)
         ├── shared/                      # InputOutputWidget, CodeView
         └── features/<category>/<tool>/  # mod.rs (view) + icon.png
 
@@ -194,7 +209,7 @@ tests/                                   # same tree as src/
 
 - `domain` never depends on `infrastructure`, GTK or the file system; it only gets data in and returns results or `DomainError`.
 - Views are thin: they read widgets, call the domain, and display the result.
-- Infrastructure dependencies are reached through domain contracts (`DatabaseRepository`), so they can be replaced in tests.
+- Infrastructure dependencies are reached through domain contracts (`DatabaseRepository`, `ConnectionRepository`), so they can be replaced in tests.
 - The tests for `src/X.rs` live in `tests/X.rs`.
 
 ## 🧩 Add your own tool

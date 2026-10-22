@@ -1,3 +1,4 @@
+mod criteria;
 pub mod geometry;
 
 use std::cell::{Cell, RefCell};
@@ -7,6 +8,7 @@ use std::rc::{Rc, Weak};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib, graphene};
 
+use self::criteria::CriteriaRow;
 use self::geometry::{facing_edge_x, hit_test, link_curve};
 use crate::domain::contract::connection_repository::ConnectionRepository;
 use crate::domain::contract::database_repository::DatabaseRepository;
@@ -36,6 +38,10 @@ pub struct Feature;
 impl FeatureContract for Feature {
     fn full_width(&self) -> bool {
         true
+    }
+
+    fn scrollable(&self) -> bool {
+        false
     }
 
     fn widget(&self) -> gtk::Widget {
@@ -109,6 +115,7 @@ struct SqlViewer {
     pending_link: RefCell<Option<Side>>,
     link_hitboxes: RefCell<Vec<Hitbox>>,
     last_result: RefCell<QueryResult>,
+    criteria_rows: RefCell<Vec<Rc<CriteriaRow>>>,
     /// Set while the code itself changes widgets, so their signal handlers
     /// don't treat it as a user edit.
     syncing: Cell<bool>,
@@ -128,9 +135,13 @@ struct SqlViewer {
     canvas_placeholder: gtk::Box,
     link_lines: gtk::DrawingArea,
     joins_box: gtk::Box,
+    joins_btn: gtk::MenuButton,
+    criteria_grid: gtk::Grid,
+    add_criteria_btn: gtk::MenuButton,
     sql_buffer: gtk::TextBuffer,
+    results_toggle: gtk::ToggleButton,
+    results_lbl: gtk::Label,
     results_scroll: gtk::ScrolledWindow,
-    results_header: gtk::Box,
     export_csv_btn: gtk::Button,
 }
 
@@ -210,7 +221,7 @@ macro_rules! with_viewer {
 impl SqlViewer {
     /// The page's root widget and a weak handle to the viewer it owns.
     fn build() -> (gtk::Widget, Weak<Self>) {
-        let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
 
         // --- Connection bar ---
         let conn_model = gtk::StringList::new(&[]);
@@ -238,26 +249,23 @@ impl SqlViewer {
         connect_btn.set_sensitive(false);
         conn_dropdown.set_sensitive(false);
 
+        let conn_state_lbl = gtk::Label::new(None);
+        conn_state_lbl.add_css_class("caption");
+        conn_state_lbl.set_valign(gtk::Align::Center);
+
         let conn_bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        conn_bar.append(&conn_state_lbl);
         conn_bar.append(&conn_dropdown);
         conn_bar.append(&conn_file_btns);
         conn_bar.append(&connect_btn);
 
-        let conn_state_lbl = gtk::Label::new(None);
-        conn_state_lbl.add_css_class("caption");
-        conn_state_lbl.set_valign(gtk::Align::Center);
-        let conn_heading = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        let conn_title = heading("Connection");
-        conn_title.set_hexpand(true);
-        conn_heading.append(&conn_title);
-        conn_heading.append(&conn_state_lbl);
-
         let status_lbl = gtk::Label::new(None);
         status_lbl.add_css_class("dim-label");
+        status_lbl.add_css_class("caption");
         status_lbl.set_halign(gtk::Align::Start);
         status_lbl.set_wrap(true);
 
-        // --- Canvas ---
+        // --- Diagram pane ---
         let fixed = gtk::Fixed::new();
         fixed.set_size_request(2000, 1200);
         fixed.add_css_class("view");
@@ -271,7 +279,6 @@ impl SqlViewer {
 
         let canvas_scroll = gtk::ScrolledWindow::new();
         canvas_scroll.add_css_class("card");
-        canvas_scroll.set_size_request(-1, 420);
         canvas_scroll.set_vexpand(true);
         canvas_scroll.set_hexpand(true);
         canvas_scroll.set_child(Some(&canvas_overlay));
@@ -288,21 +295,51 @@ impl SqlViewer {
         canvas_placeholder.append(&placeholder_icon);
         canvas_placeholder.append(&placeholder_title);
         canvas_placeholder.append(&gtk::Label::new(Some(
-            "Connect to a database, then right-click here to add a table",
+            "Connect, then right-click here to add a table — foreign keys are linked automatically.\n\
+             Link two columns with their link icons; click a join line to change it.",
         )));
+        if let Some(lbl) = canvas_placeholder.last_child().and_downcast::<gtk::Label>() {
+            lbl.set_justify(gtk::Justification::Center);
+        }
 
-        let canvas_frame = gtk::Overlay::new();
-        canvas_frame.set_child(Some(&canvas_scroll));
-        canvas_frame.add_overlay(&canvas_placeholder);
+        let diagram_pane = gtk::Overlay::new();
+        diagram_pane.set_child(Some(&canvas_scroll));
+        diagram_pane.add_overlay(&canvas_placeholder);
+        diagram_pane.set_size_request(-1, 120);
 
-        let canvas_panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        canvas_panel.append(&canvas_frame);
-        canvas_panel.append(&canvas_resize_handle(&canvas_scroll));
+        // --- Criteria pane ---
+        let criteria_grid = gtk::Grid::builder()
+            .row_spacing(2)
+            .column_spacing(6)
+            .margin_top(6)
+            .margin_bottom(6)
+            .margin_start(8)
+            .margin_end(8)
+            .build();
+        let criteria_scroll = gtk::ScrolledWindow::new();
+        criteria_scroll.add_css_class("card");
+        criteria_scroll.set_vexpand(true);
+        criteria_scroll.set_child(Some(&criteria_grid));
+        let add_criteria_btn = gtk::MenuButton::builder()
+            .icon_name("list-add-symbolic")
+            .tooltip_text("Add a column to filter or sort on")
+            .build();
+        add_criteria_btn.add_css_class("flat");
+        let criteria_pane = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        let criteria_header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let criteria_title = heading("Criteria");
+        let criteria_hint = hint(
+            "Filter: “> 8”, “LIKE 'A%'”, “IS NULL” or a value. Rows must match every Filter, or every Or….",
+        );
+        criteria_hint.set_hexpand(true);
+        criteria_header.append(&criteria_title);
+        criteria_header.append(&criteria_hint);
+        criteria_header.append(&add_criteria_btn);
+        criteria_pane.append(&criteria_header);
+        criteria_pane.append(&criteria_scroll);
+        criteria_pane.set_size_request(-1, 100);
 
-        // --- Joins panel ---
-        let joins_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
-
-        // --- SQL editor ---
+        // --- SQL pane ---
         let sql_buffer = gtk::TextBuffer::new(None);
         let sql_view = gtk::TextView::with_buffer(&sql_buffer);
         sql_view.add_css_class("monospace");
@@ -314,29 +351,30 @@ impl SqlViewer {
 
         let sql_scroll = gtk::ScrolledWindow::new();
         sql_scroll.add_css_class("card");
-        sql_scroll.set_min_content_height(110);
-        sql_scroll.set_max_content_height(260);
-        sql_scroll.set_propagate_natural_height(true);
+        sql_scroll.set_vexpand(true);
         sql_scroll.set_hexpand(true);
         sql_scroll.set_child(Some(&sql_view));
+        let sql_pane = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        let sql_header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let sql_hint = hint(
+            "Follows the canvas until you edit it. Type or paste a SELECT to draw it on the canvas.",
+        );
+        sql_hint.set_hexpand(true);
+        sql_header.append(&heading("SQL"));
+        sql_header.append(&sql_hint);
+        sql_pane.append(&sql_header);
+        sql_pane.append(&sql_scroll);
+        sql_pane.set_size_request(-1, 90);
 
-        let generate_sql_btn = gtk::Button::builder()
-            .label("Generate from canvas")
-            .tooltip_text("Replace the query with one built from the canvas")
-            .build();
-        let run_btn = gtk::Button::builder()
-            .label("Run Query")
-            .tooltip_text("Run the query (Ctrl+Enter)")
-            .build();
-        run_btn.add_css_class("suggested-action");
-        let sql_actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        sql_actions.append(&generate_sql_btn);
-        sql_actions.append(&run_btn);
-
-        // --- Results ---
+        // --- Results pane ---
         let results_lbl = heading("Results");
         results_lbl.set_hexpand(true);
-        let export_csv_btn = gtk::Button::with_label("Export CSV…");
+        results_lbl.set_xalign(0.0);
+        let export_csv_btn = gtk::Button::builder()
+            .icon_name("document-save-as-symbolic")
+            .tooltip_text("Export the results as CSV…")
+            .build();
+        export_csv_btn.add_css_class("flat");
         export_csv_btn.set_sensitive(false);
         let results_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         results_header.append(&results_lbl);
@@ -344,34 +382,140 @@ impl SqlViewer {
 
         let results_scroll = gtk::ScrolledWindow::new();
         results_scroll.add_css_class("card");
-        results_scroll.set_min_content_height(160);
         results_scroll.set_vexpand(true);
         results_scroll.set_hexpand(true);
         results_scroll.set_child(Some(&results_placeholder(
             "Run the query to see results here.",
         )));
+        let results_pane = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        results_pane.append(&results_header);
+        results_pane.append(&results_scroll);
+        results_pane.set_size_request(-1, 110);
 
-        root.append(&conn_heading);
+        // --- Panes: diagram / criteria / SQL / results, each resizable ---
+        let paned = |start: &gtk::Widget, end: &gtk::Widget, position: i32| {
+            gtk::Paned::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .wide_handle(true)
+                .shrink_start_child(false)
+                .shrink_end_child(false)
+                .start_child(start)
+                .end_child(end)
+                .position(position)
+                .vexpand(true)
+                .build()
+        };
+        let sql_results = paned(sql_pane.upcast_ref(), results_pane.upcast_ref(), 130);
+        let lower = paned(criteria_pane.upcast_ref(), sql_results.upcast_ref(), 150);
+        let panes = paned(diagram_pane.upcast_ref(), lower.upcast_ref(), 300);
+
+        let pane_toggle = |icon: &str, label: &str, tooltip: &str| {
+            gtk::ToggleButton::builder()
+                .child(
+                    &adw::ButtonContent::builder()
+                        .icon_name(icon)
+                        .label(label)
+                        .build(),
+                )
+                .tooltip_text(tooltip)
+                .active(true)
+                .build()
+        };
+        let diagram_toggle = pane_toggle(
+            "view-grid-symbolic",
+            "Diagram",
+            "Show or hide the tables canvas",
+        );
+        let criteria_toggle = pane_toggle(
+            "view-list-symbolic",
+            "Criteria",
+            "Show or hide the criteria grid",
+        );
+        let sql_toggle = pane_toggle(
+            "text-x-generic-symbolic",
+            "SQL",
+            "Show or hide the SQL query",
+        );
+        let results_toggle = pane_toggle(
+            "x-office-spreadsheet-symbolic",
+            "Results",
+            "Show or hide the results",
+        );
+        let pane_toggles = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        pane_toggles.add_css_class("linked");
+        for (toggle, pane) in [
+            (&diagram_toggle, diagram_pane.upcast_ref::<gtk::Widget>()),
+            (&criteria_toggle, criteria_pane.upcast_ref()),
+            (&sql_toggle, sql_pane.upcast_ref()),
+            (&results_toggle, results_pane.upcast_ref()),
+        ] {
+            toggle
+                .bind_property("active", pane, "visible")
+                .sync_create()
+                .build();
+            pane_toggles.append(toggle);
+        }
+        // A paned whose two panes are hidden must hide too, or it keeps its space.
+        let sync_paneds = glib::clone!(
+            #[weak]
+            sql_pane,
+            #[weak]
+            results_pane,
+            #[weak]
+            criteria_pane,
+            #[weak]
+            sql_results,
+            #[weak]
+            lower,
+            move || {
+                sql_results.set_visible(sql_pane.is_visible() || results_pane.is_visible());
+                lower.set_visible(criteria_pane.is_visible() || sql_results.is_visible());
+            }
+        );
+        for pane in [&sql_pane, &results_pane, &criteria_pane] {
+            let sync = sync_paneds.clone();
+            pane.connect_visible_notify(move |_| sync());
+        }
+
+        let joins_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        joins_box.set_margin_top(6);
+        joins_box.set_margin_bottom(6);
+        joins_box.set_margin_start(6);
+        joins_box.set_margin_end(6);
+        let joins_btn = gtk::MenuButton::builder()
+            .label("Joins")
+            .tooltip_text("Joins between the canvas tables")
+            .popover(&gtk::Popover::builder().child(&joins_box).build())
+            .build();
+
+        let generate_sql_btn = gtk::Button::builder()
+            .icon_name("view-refresh-symbolic")
+            .tooltip_text("Rebuild the query from the canvas and criteria")
+            .build();
+        let run_btn = gtk::Button::builder()
+            .child(
+                &adw::ButtonContent::builder()
+                    .icon_name("media-playback-start-symbolic")
+                    .label("Run")
+                    .build(),
+            )
+            .tooltip_text("Run the query (Ctrl+Enter)")
+            .build();
+        run_btn.add_css_class("suggested-action");
+
+        let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        spacer.set_hexpand(true);
+        toolbar.append(&pane_toggles);
+        toolbar.append(&spacer);
+        toolbar.append(&joins_btn);
+        toolbar.append(&generate_sql_btn);
+        toolbar.append(&run_btn);
+
         root.append(&conn_bar);
         root.append(&status_lbl);
-        root.append(&heading("Schema canvas"));
-        root.append(&hint(
-            "Right-click the canvas to add a table; its foreign keys are linked automatically. \
-             Click the link icon on two columns to join them yourself, \
-             or a join line to change its columns.",
-        ));
-        root.append(&canvas_panel);
-        root.append(&heading("Joins"));
-        root.append(&joins_box);
-        root.append(&heading("SQL query"));
-        root.append(&hint(
-            "Follows the canvas until you edit it. Type or paste a SELECT to draw it on the canvas; \
-             add a WHERE, ORDER BY…, then Run Query.",
-        ));
-        root.append(&sql_scroll);
-        root.append(&sql_actions);
-        root.append(&results_header);
-        root.append(&results_scroll);
+        root.append(&toolbar);
+        root.append(&panes);
 
         let this = Rc::new(Self {
             db: RefCell::new(Box::new(DatabaseApi::default())),
@@ -385,6 +529,7 @@ impl SqlViewer {
             pending_link: RefCell::default(),
             link_hitboxes: RefCell::default(),
             last_result: RefCell::default(),
+            criteria_rows: RefCell::default(),
             syncing: Cell::new(false),
             generated_sql: RefCell::default(),
             sql_edit_serial: Cell::new(0),
@@ -398,9 +543,13 @@ impl SqlViewer {
             canvas_placeholder,
             link_lines,
             joins_box,
+            joins_btn,
+            criteria_grid,
+            add_criteria_btn,
             sql_buffer,
+            results_toggle,
+            results_lbl,
             results_scroll,
-            results_header,
             export_csv_btn,
         });
         let weak = Rc::downgrade(&this);
@@ -469,6 +618,8 @@ impl SqlViewer {
         this.fixed.add_controller(left_click);
 
         this.refresh_joins_panel();
+        this.setup_add_criteria_menu();
+        this.rebuild_criteria_grid();
         this.update_connection_state();
         this.load_connections();
 
@@ -533,6 +684,8 @@ impl SqlViewer {
             self.joins_box.remove(&child);
         }
         let joins = self.joins.borrow();
+        self.joins_btn
+            .set_label(&format!("Joins ({})", joins.len()));
         if joins.is_empty() {
             self.joins_box.append(&hint(
                 "No joins yet. Link a column from each table to combine them.",
@@ -825,7 +978,10 @@ impl SqlViewer {
         for col in &card.columns {
             let w = weak.clone();
             col.check.connect_toggled(move |_| {
-                if let Some(this) = w.upgrade() {
+                if let Some(this) = w.upgrade()
+                    && !this.syncing.get()
+                {
+                    this.sync_criteria_rows();
                     this.canvas_changed();
                 }
             });
@@ -927,6 +1083,7 @@ impl SqlViewer {
         }
         self.link_lines.queue_draw();
         self.update_canvas_placeholder();
+        self.sync_criteria_rows();
         self.canvas_changed();
     }
 
@@ -954,6 +1111,7 @@ impl SqlViewer {
         self.fixed.put(&card.frame, x, y);
         self.table_cards.borrow_mut().push(Rc::clone(&card));
         self.update_canvas_placeholder();
+        self.sync_criteria_rows();
         Some(card)
     }
 
@@ -1230,8 +1388,9 @@ impl SqlViewer {
                 })
             })
             .collect();
+        let criteria = self.criteria_snapshot(&cards);
         let kind = self.db.borrow().kind().unwrap_or(DbKind::Sqlite);
-        logic::build_select(kind, &tables, &joins, MAX_RESULT_ROWS)
+        logic::build_select(kind, &tables, &joins, &criteria, MAX_RESULT_ROWS)
             .map(|sql| sql_format::format(&sql))
     }
 
@@ -1333,8 +1492,15 @@ impl SqlViewer {
             .filter(|(_, k)| k.is_none())
             .map(|(t, _)| t.table.as_str())
             .collect();
-        if unknown.is_empty() {
-            self.set_status("Canvas redrawn from the SQL query.");
+        if unknown.is_empty() && parsed.complete {
+            // The designer holds the whole query: its edits may rewrite it.
+            *self.generated_sql.borrow_mut() = sql;
+            self.set_status("Canvas and criteria redrawn from the SQL query.");
+        } else if unknown.is_empty() {
+            self.set_status(
+                "Canvas redrawn from the SQL query. It has clauses the designer can't show, \
+                 so canvas edits won't rewrite it — use Rebuild to replace it.",
+            );
         } else {
             self.set_error(&format!(
                 "Unknown table(s) in the query: {}",
@@ -1398,6 +1564,7 @@ impl SqlViewer {
                 self.link_columns(l, &j.left_column, r, &j.right_column);
             }
         }
+        self.apply_criteria(&cards, &parsed.criteria);
     }
 
     fn do_run_query(&self) {
@@ -1425,30 +1592,20 @@ impl SqlViewer {
         let status = format!("{} row(s){truncated} — {}", rows.len(), timestamp());
         self.render_results((columns, rows));
         self.set_status(&status);
-        self.scroll_to_results();
+        self.show_results();
     }
 
-    /// Scrolls the page so the results header is at the top, once the new
-    /// results have been laid out.
-    fn scroll_to_results(&self) {
-        let header = self.results_header.clone();
-        glib::idle_add_local_once(move || {
-            let Some(page) = header
-                .ancestor(gtk::ScrolledWindow::static_type())
-                .and_downcast::<gtk::ScrolledWindow>()
-            else {
-                return;
-            };
-            if let Some(content) = page.child()
-                && let Some(point) = header.compute_point(&content, &graphene::Point::zero())
-            {
-                page.vadjustment().set_value(f64::from(point.y()) - 12.0);
-            }
-        });
+    fn show_results(&self) {
+        self.results_toggle.set_active(true);
     }
 
     fn render_results(&self, (columns, rows): QueryResult) {
         self.export_csv_btn.set_sensitive(!columns.is_empty());
+        self.results_lbl.set_text(&match rows.len() {
+            _ if columns.is_empty() => "Results".to_string(),
+            1 => "Results · 1 row".to_string(),
+            n => format!("Results · {n} rows"),
+        });
         if columns.is_empty() {
             self.results_scroll
                 .set_child(Some(&results_placeholder("Query executed — no rows.")));
@@ -1936,37 +2093,4 @@ impl LeaveGuard for SqlViewer {
         });
         dialog.present(Some(&self.connect_btn));
     }
-}
-
-fn canvas_resize_handle(canvas_scroll: &gtk::ScrolledWindow) -> gtk::Box {
-    let handle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    handle.set_size_request(-1, 10);
-    handle.set_halign(gtk::Align::Fill);
-    handle.add_css_class("dim-label");
-    handle.set_cursor_from_name(Some("ns-resize"));
-    handle.set_tooltip_text(Some("Drag to resize the canvas"));
-    let grip = gtk::Label::new(Some("⋯"));
-    grip.set_hexpand(true);
-    grip.add_css_class("dim-label");
-    handle.append(&grip);
-
-    let start = Rc::new(Cell::new(0));
-    let drag = gtk::GestureDrag::new();
-    drag.connect_drag_begin(glib::clone!(
-        #[strong]
-        start,
-        #[weak]
-        canvas_scroll,
-        move |_, _, _| start.set(canvas_scroll.height())
-    ));
-    drag.connect_drag_update(glib::clone!(
-        #[weak]
-        canvas_scroll,
-        move |_, _, dy| {
-            let new_h = (start.get() as f64 + dy).max(240.0);
-            canvas_scroll.set_size_request(-1, new_h as i32);
-        }
-    ));
-    handle.add_controller(drag);
-    handle
 }

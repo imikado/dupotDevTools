@@ -9,6 +9,12 @@ pub trait FeatureContract {
         false
     }
 
+    /// Opt out of the detail page's vertical scrolling, for views that fill
+    /// the window and scroll their own panes.
+    fn scrollable(&self) -> bool {
+        true
+    }
+
     fn widget(&self) -> gtk::Widget;
 
     /// The widget and, for tools holding unsaved work, a guard consulted

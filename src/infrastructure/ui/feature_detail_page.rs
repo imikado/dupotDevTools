@@ -39,16 +39,22 @@ pub fn build(
     outer.set_margin_start(18);
     outer.set_margin_end(18);
 
-    let scroll = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Never)
-        .vexpand(true)
-        .hexpand(true)
-        .child(&outer)
-        .build();
+    let body: gtk::Widget = if feature.scrollable() {
+        gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vexpand(true)
+            .hexpand(true)
+            .child(&outer)
+            .build()
+            .upcast()
+    } else {
+        outer.set_vexpand(true);
+        outer
+    };
 
     // Features reach this through `widget.ancestor(ToastOverlay)`.
     let toasts = adw::ToastOverlay::new();
-    toasts.set_child(Some(&scroll));
+    toasts.set_child(Some(&body));
     toolbar_view.set_content(Some(&toasts));
     let page = adw::NavigationPage::new(&toolbar_view, entity.title);
 
