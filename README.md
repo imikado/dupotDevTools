@@ -15,7 +15,7 @@ All in one native, fast, offline GTK4 / Libadwaita application written in Rust.
 ![Platforms](https://img.shields.io/badge/Linux_·_Windows-lightgrey)
 ![License](https://img.shields.io/badge/License-LGPL--2.1-green)
 
-![Dupot Dev Tools](export/screenshots/home.png)
+![Dupot Dev Tools in action: build a query on the SQL Viewer canvas, filter it, run it, then type SQL and watch it drawn back](export/screenshots/promo.gif)
 
 </div>
 
@@ -33,6 +33,8 @@ Dupot Dev Tools gathers all those small everyday utilities in **one desktop app*
 - 🧩 **Easy to extend**: clean architecture, each tool is a small tested module
 
 ## 🧰 Tools
+
+![All tools](export/screenshots/home.png)
 
 | Category | Tool | What it does |
 |---|---|---|
@@ -68,9 +70,11 @@ A visual query designer, in the spirit of SQL Server Management Studio, to under
 - **Run it** (Ctrl+Enter), browse the results and **export them to CSV**
 - **Four resizable panes**: *Diagram*, *Criteria*, *SQL* and *Results*, each one can be shown or hidden from the toolbar
 
-| New connection | Add a table | Query result |
-|---|---|---|
-| ![](export/screenshots/sqlviewer_new_connection.png) | ![](export/screenshots/sqlviewer_add_table.png) | ![](export/screenshots/sqlviewer_request.png) |
+| New connection | Add a table: joins follow the foreign keys |
+|---|---|
+| ![New connection](export/screenshots/sqlviewer_new_connection.png) | ![Add a table](export/screenshots/sqlviewer_add_table.png) |
+| **Criteria grid: alias, filter `> 8`, sort, then Run** | **Type a `SELECT`: it is drawn on the canvas and in the grid** |
+| ![Query result](export/screenshots/sqlviewer_request.png) | ![SQL to canvas](export/screenshots/sqlviewer_sql_to_canvas.png) |
 
 ## 🛠️ Tech stack
 

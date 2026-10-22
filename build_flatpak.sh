@@ -11,6 +11,7 @@
 # Flathub-maintained flatpak bundling it) is used instead.
 #
 # Usage: ./build_flatpak.sh [output.flatpak]
+#   (default: export/flatpak/DupotDevTools-<Cargo.toml version>.flatpak)
 #   FLATPAK_SCOPE=--user ./build_flatpak.sh   install missing SDKs per-user
 #                                             (default: --system)
 #   FLATPAK_REPO=/other/disk/repo ./build_flatpak.sh   ostree repo location
@@ -22,9 +23,11 @@ cd "$repo_root"
 
 manifest="export/flatpak/org.dupot.devtools.yml"
 app_id="org.dupot.devtools"
+app_name="DupotDevTools"
+version="$(grep -m1 -oP '^version = "\K[^"]+' Cargo.toml)"
 build_dir="build-dir"
 local_repo="${FLATPAK_REPO:-repo}"
-output="${1:-${app_id}.flatpak}"
+output="${1:-export/flatpak/${app_name}-${version}.flatpak}"
 scope="${FLATPAK_SCOPE:---system}"
 
 # Build date shown in the About dialog.
@@ -69,6 +72,7 @@ flatpak run --command=flatpak-builder org.flatpak.Builder \
     --force-clean --repo="$local_repo" "$build_dir" "$generated"
 
 echo "=== Bundling -> $output ==="
+mkdir -p "$(dirname "$output")"
 # --runtime-repo points the bundle at Flathub for org.gnome.Platform, so
 # installing it on a machine that doesn't already have that runtime pulls
 # it automatically instead of failing.

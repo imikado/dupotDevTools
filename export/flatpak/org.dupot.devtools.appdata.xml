@@ -26,15 +26,19 @@
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/imikado/dupotDevTools/refs/heads/main/export/screenshots/sqlviewer_joins.png</image>
-      <caption>SQL Viewer: tables and joins on the canvas</caption>
+      <caption>SQL Viewer: tables, joins and criteria grid</caption>
     </screenshot>
     <screenshot>
       <image>https://raw.githubusercontent.com/imikado/dupotDevTools/refs/heads/main/export/screenshots/sqlviewer_request.png</image>
-      <caption>SQL Viewer: query results</caption>
+      <caption>SQL Viewer: filtered, sorted query results</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/imikado/dupotDevTools/refs/heads/main/export/screenshots/database_section.png</image>
-      <caption>Database section</caption>
+      <image>https://raw.githubusercontent.com/imikado/dupotDevTools/refs/heads/main/export/screenshots/sqlviewer_sql_to_canvas.png</image>
+      <caption>SQL Viewer: a typed query drawn back on the canvas</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/imikado/dupotDevTools/refs/heads/main/export/screenshots/home.png</image>
+      <caption>All tools</caption>
     </screenshot>
   </screenshots>
 
