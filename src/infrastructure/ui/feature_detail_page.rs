@@ -1,9 +1,15 @@
+use std::rc::Weak;
+
 use adw::prelude::*;
 
 use crate::domain::entity::feature_entity::FeatureEntity;
-use crate::infrastructure::ui::feature_contract::FeatureContract;
+use crate::infrastructure::ui::feature_contract::{FeatureContract, FeatureView, LeaveGuard};
 
-pub fn build(entity: &FeatureEntity, feature: &dyn FeatureContract) -> adw::NavigationPage {
+/// The page and its leave guard, if the feature has one.
+pub fn build(
+    entity: &FeatureEntity,
+    feature: &dyn FeatureContract,
+) -> (adw::NavigationPage, Option<Weak<dyn LeaveGuard>>) {
     let header_bar = adw::HeaderBar::new();
     header_bar.set_title_widget(Some(&adw::WindowTitle::new(
         entity.title,
@@ -13,7 +19,10 @@ pub fn build(entity: &FeatureEntity, feature: &dyn FeatureContract) -> adw::Navi
     let toolbar_view = adw::ToolbarView::new();
     toolbar_view.add_top_bar(&header_bar);
 
-    let content = feature.widget();
+    let FeatureView {
+        widget: content,
+        leave_guard,
+    } = feature.view();
     let outer: gtk::Widget = if feature.full_width() {
         content.set_hexpand(true);
         content.upcast()
@@ -41,7 +50,33 @@ pub fn build(entity: &FeatureEntity, feature: &dyn FeatureContract) -> adw::Navi
     let toasts = adw::ToastOverlay::new();
     toasts.set_child(Some(&scroll));
     toolbar_view.set_content(Some(&toasts));
-    adw::NavigationPage::new(&toolbar_view, entity.title)
+    let page = adw::NavigationPage::new(&toolbar_view, entity.title);
+
+    if let Some(guard) = &leave_guard {
+        // Popping only through this button lets the guard run first.
+        page.set_can_pop(false);
+        let back_btn = gtk::Button::builder()
+            .icon_name("go-previous-symbolic")
+            .tooltip_text("Back")
+            .build();
+        header_bar.pack_start(&back_btn);
+        let guard = guard.clone();
+        let page_weak = page.downgrade();
+        back_btn.connect_clicked(move |_| {
+            let Some(guard) = guard.upgrade() else { return };
+            let page_weak = page_weak.clone();
+            guard.confirm_leave(Box::new(move || {
+                if let Some(nav) = page_weak
+                    .upgrade()
+                    .and_then(|p| p.ancestor(adw::NavigationView::static_type()))
+                    .and_downcast::<adw::NavigationView>()
+                {
+                    nav.pop();
+                }
+            }));
+        });
+    }
+    (page, leave_guard)
 }
 
 /// Shows a short notification on the page hosting `widget`.

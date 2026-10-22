@@ -56,3 +56,48 @@ fn invalid_port_is_reported() {
     let config = form.into_config(DbKind::Postgresql, 0).unwrap();
     assert_eq!(config.port().unwrap_err().message(), "Invalid port: abc");
 }
+
+#[test]
+fn kind_ids_round_trip() {
+    for kind in DbKind::ALL {
+        assert_eq!(DbKind::from_id(kind.id()), Some(kind));
+    }
+    assert_eq!(DbKind::from_id("oracle"), None);
+}
+
+#[test]
+fn password_is_needed_only_for_servers_without_one() {
+    let sqlite = ConnectionForm {
+        path: "/tmp/app.db".into(),
+        ..Default::default()
+    }
+    .into_config(DbKind::Sqlite, 0)
+    .unwrap();
+    assert!(!sqlite.needs_password());
+
+    let mut pg = ConnectionForm::default()
+        .into_config(DbKind::Postgresql, 0)
+        .unwrap();
+    assert!(
+        !pg.needs_password(),
+        "an empty password typed in the form counts"
+    );
+    pg.forget_password();
+    assert!(pg.needs_password());
+    pg.set_password("secret".into());
+    assert_eq!(pg.param("password"), "secret");
+    assert!(!pg.needs_password());
+}
+
+#[test]
+fn persisted_params_exclude_the_password() {
+    let config = ConnectionForm {
+        user: "bob".into(),
+        password: "secret".into(),
+        ..Default::default()
+    }
+    .into_config(DbKind::Postgresql, 0)
+    .unwrap();
+    let keys: Vec<_> = config.persisted_params().map(|(k, _)| k).collect();
+    assert_eq!(keys, ["database", "host", "port", "user"]);
+}

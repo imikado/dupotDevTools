@@ -1,5 +1,5 @@
 use dupot_dev_tools::domain::contract::database_repository::DatabaseRepository;
-use dupot_dev_tools::domain::entity::database::{ConnectionForm, DbKind};
+use dupot_dev_tools::domain::entity::database::{ConnectionForm, DbKind, ForeignKey};
 use dupot_dev_tools::infrastructure::api::database_api::DatabaseApi;
 
 fn in_memory_db() -> DatabaseApi {
@@ -68,4 +68,24 @@ fn close_disconnects() {
     let mut db = in_memory_db();
     db.close();
     assert!(!db.is_connected());
+}
+
+#[test]
+fn sqlite_foreign_keys() {
+    let mut db = in_memory_db();
+    db.execute("CREATE TABLE author (id INTEGER PRIMARY KEY)")
+        .unwrap();
+    db.execute(
+        "CREATE TABLE book (id INTEGER PRIMARY KEY, author_id INTEGER REFERENCES author(id))",
+    )
+    .unwrap();
+    assert_eq!(
+        db.list_foreign_keys("book").unwrap(),
+        [ForeignKey {
+            column: "author_id".into(),
+            ref_table: "author".into(),
+            ref_column: "id".into(),
+        }]
+    );
+    assert!(db.list_foreign_keys("author").unwrap().is_empty());
 }

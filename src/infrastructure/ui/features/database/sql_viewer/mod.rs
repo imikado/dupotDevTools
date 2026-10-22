@@ -1,23 +1,35 @@
 pub mod geometry;
 
 use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use std::path::{Path, PathBuf};
+use std::rc::{Rc, Weak};
 
 use adw::prelude::*;
 use gtk::{gdk, gio, glib, graphene};
 
 use self::geometry::{facing_edge_x, hit_test, link_curve};
+use crate::domain::contract::connection_repository::ConnectionRepository;
 use crate::domain::contract::database_repository::DatabaseRepository;
-use crate::domain::entity::database::{ConnectionConfig, ConnectionForm, DbKind, QueryResult};
+use crate::domain::entity::database::{
+    ConnectionConfig, ConnectionForm, DbKind, ForeignKey, QueryResult,
+};
 use crate::domain::error::DomainResult;
 use crate::domain::feature::database::sql_viewer::{
-    self as logic, CanvasJoin, CanvasTable, MAX_RESULT_ROWS,
+    self as logic, CanvasJoin, CanvasTable, MAX_RESULT_ROWS, ParsedSelect,
 };
+use crate::domain::feature::formating::sql_format;
+use crate::infrastructure::api::connection_store_api::ConnectionStoreApi;
 use crate::infrastructure::api::database_api::DatabaseApi;
-use crate::infrastructure::ui::feature_contract::FeatureContract;
+use crate::infrastructure::ui::feature_contract::{FeatureContract, FeatureView, LeaveGuard};
 use crate::infrastructure::ui::shared::input_output_widget::timestamp;
 
 const LINK_COLOR: (f64, f64, f64) = (0.22, 0.51, 0.89);
+/// Pause after the last keystroke before the SQL is redrawn on the canvas.
+const SQL_SYNC_DELAY: std::time::Duration = std::time::Duration::from_millis(700);
+/// Table cards scroll their column list past this height.
+const CARD_MAX_LIST_HEIGHT: i32 = 380;
+/// Height of one column row in a table card (its link button sets it).
+const CARD_ROW_HEIGHT: i32 = 34;
 
 pub struct Feature;
 
@@ -27,7 +39,16 @@ impl FeatureContract for Feature {
     }
 
     fn widget(&self) -> gtk::Widget {
-        SqlViewer::build()
+        self.view().widget
+    }
+
+    fn view(&self) -> FeatureView {
+        let (widget, viewer) = SqlViewer::build();
+        let leave_guard: Weak<dyn LeaveGuard> = viewer;
+        FeatureView {
+            widget,
+            leave_guard: Some(leave_guard),
+        }
     }
 }
 
@@ -41,6 +62,17 @@ struct TableCard {
     table: String,
     frame: gtk::Frame,
     columns: Vec<ColumnWidgets>,
+    foreign_keys: Vec<ForeignKey>,
+}
+
+impl TableCard {
+    fn column(&self, name: &str) -> Option<&ColumnWidgets> {
+        self.columns.iter().find(|c| c.name == name).or_else(|| {
+            self.columns
+                .iter()
+                .find(|c| c.name.eq_ignore_ascii_case(name))
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -65,18 +97,32 @@ struct Hitbox {
 /// so leaving the page drops everything, including the DB connection.
 struct SqlViewer {
     db: RefCell<Box<dyn DatabaseRepository>>,
+    store: Box<dyn ConnectionRepository>,
     connections: RefCell<Vec<ConnectionConfig>>,
+    /// File the connections were last opened from or saved to.
+    connections_file: RefCell<Option<PathBuf>>,
+    /// Connections changed since they were last opened or saved.
+    unsaved: Cell<bool>,
     tables_cache: RefCell<Vec<String>>,
     table_cards: RefCell<Vec<Rc<TableCard>>>,
     joins: RefCell<Vec<Rc<Join>>>,
     pending_link: RefCell<Option<Side>>,
     link_hitboxes: RefCell<Vec<Hitbox>>,
     last_result: RefCell<QueryResult>,
+    /// Set while the code itself changes widgets, so their signal handlers
+    /// don't treat it as a user edit.
+    syncing: Cell<bool>,
+    /// Last SQL written from the canvas; while the editor still holds it,
+    /// canvas edits rewrite it.
+    generated_sql: RefCell<String>,
+    /// Bumped on each SQL edit; only the latest one's timer redraws the canvas.
+    sql_edit_serial: Cell<u32>,
 
     conn_model: gtk::StringList,
     conn_dropdown: gtk::DropDown,
     connect_btn: gtk::Button,
     new_conn_btn: gtk::Button,
+    conn_state_lbl: gtk::Label,
     status_lbl: gtk::Label,
     fixed: gtk::Fixed,
     canvas_placeholder: gtk::Box,
@@ -84,6 +130,7 @@ struct SqlViewer {
     joins_box: gtk::Box,
     sql_buffer: gtk::TextBuffer,
     results_scroll: gtk::ScrolledWindow,
+    results_header: gtk::Box,
     export_csv_btn: gtk::Button,
 }
 
@@ -161,14 +208,31 @@ macro_rules! with_viewer {
 }
 
 impl SqlViewer {
-    fn build() -> gtk::Widget {
+    /// The page's root widget and a weak handle to the viewer it owns.
+    fn build() -> (gtk::Widget, Weak<Self>) {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
 
         // --- Connection bar ---
         let conn_model = gtk::StringList::new(&[]);
         let conn_dropdown = gtk::DropDown::new(Some(conn_model.clone()), gtk::Expression::NONE);
         conn_dropdown.set_hexpand(true);
-        let new_conn_btn = gtk::Button::with_label("New Connection…");
+        let open_conns_btn = gtk::Button::builder()
+            .icon_name("document-open-symbolic")
+            .tooltip_text("Open a connections file…")
+            .build();
+        let save_conns_btn = gtk::Button::builder()
+            .icon_name("document-save-symbolic")
+            .tooltip_text("Save the connections (without passwords)")
+            .build();
+        let new_conn_btn = gtk::Button::builder()
+            .icon_name("list-add-symbolic")
+            .tooltip_text("New connection…")
+            .build();
+        let conn_file_btns = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        conn_file_btns.add_css_class("linked");
+        conn_file_btns.append(&open_conns_btn);
+        conn_file_btns.append(&save_conns_btn);
+        conn_file_btns.append(&new_conn_btn);
         let connect_btn = gtk::Button::with_label("Connect");
         connect_btn.add_css_class("suggested-action");
         connect_btn.set_sensitive(false);
@@ -176,8 +240,17 @@ impl SqlViewer {
 
         let conn_bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         conn_bar.append(&conn_dropdown);
-        conn_bar.append(&new_conn_btn);
+        conn_bar.append(&conn_file_btns);
         conn_bar.append(&connect_btn);
+
+        let conn_state_lbl = gtk::Label::new(None);
+        conn_state_lbl.add_css_class("caption");
+        conn_state_lbl.set_valign(gtk::Align::Center);
+        let conn_heading = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let conn_title = heading("Connection");
+        conn_title.set_hexpand(true);
+        conn_heading.append(&conn_title);
+        conn_heading.append(&conn_state_lbl);
 
         let status_lbl = gtk::Label::new(None);
         status_lbl.add_css_class("dim-label");
@@ -247,8 +320,14 @@ impl SqlViewer {
         sql_scroll.set_hexpand(true);
         sql_scroll.set_child(Some(&sql_view));
 
-        let generate_sql_btn = gtk::Button::with_label("Generate from canvas");
-        let run_btn = gtk::Button::with_label("Run Query");
+        let generate_sql_btn = gtk::Button::builder()
+            .label("Generate from canvas")
+            .tooltip_text("Replace the query with one built from the canvas")
+            .build();
+        let run_btn = gtk::Button::builder()
+            .label("Run Query")
+            .tooltip_text("Run the query (Ctrl+Enter)")
+            .build();
         run_btn.add_css_class("suggested-action");
         let sql_actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         sql_actions.append(&generate_sql_btn);
@@ -272,21 +351,22 @@ impl SqlViewer {
             "Run the query to see results here.",
         )));
 
-        root.append(&heading("Connection"));
+        root.append(&conn_heading);
         root.append(&conn_bar);
         root.append(&status_lbl);
         root.append(&heading("Schema canvas"));
         root.append(&hint(
-            "Right-click the canvas to add a connected table. \
-             Click the link icon on two columns to join them. \
-             Click a join line to change its columns.",
+            "Right-click the canvas to add a table; its foreign keys are linked automatically. \
+             Click the link icon on two columns to join them yourself, \
+             or a join line to change its columns.",
         ));
         root.append(&canvas_panel);
         root.append(&heading("Joins"));
         root.append(&joins_box);
         root.append(&heading("SQL query"));
         root.append(&hint(
-            "Built from the canvas — edit freely to add a WHERE, GROUP BY, ORDER BY…, then Run Query.",
+            "Follows the canvas until you edit it. Type or paste a SELECT to draw it on the canvas; \
+             add a WHERE, ORDER BY…, then Run Query.",
         ));
         root.append(&sql_scroll);
         root.append(&sql_actions);
@@ -295,17 +375,24 @@ impl SqlViewer {
 
         let this = Rc::new(Self {
             db: RefCell::new(Box::new(DatabaseApi::default())),
+            store: Box::new(ConnectionStoreApi::default()),
             connections: RefCell::default(),
+            connections_file: RefCell::default(),
+            unsaved: Cell::new(false),
             tables_cache: RefCell::default(),
             table_cards: RefCell::default(),
             joins: RefCell::default(),
             pending_link: RefCell::default(),
             link_hitboxes: RefCell::default(),
             last_result: RefCell::default(),
+            syncing: Cell::new(false),
+            generated_sql: RefCell::default(),
+            sql_edit_serial: Cell::new(0),
             conn_model,
             conn_dropdown,
             connect_btn: connect_btn.clone(),
             new_conn_btn,
+            conn_state_lbl,
             status_lbl,
             fixed,
             canvas_placeholder,
@@ -313,6 +400,7 @@ impl SqlViewer {
             joins_box,
             sql_buffer,
             results_scroll,
+            results_header,
             export_csv_btn,
         });
         let weak = Rc::downgrade(&this);
@@ -327,10 +415,33 @@ impl SqlViewer {
         this.new_conn_btn
             .connect_clicked(with_viewer!(weak, |this| this.open_new_connection_dialog()));
         connect_btn.connect_clicked(with_viewer!(weak, |this| this.do_connect()));
+        open_conns_btn.connect_clicked(with_viewer!(weak, |this| this.do_open_connections()));
+        save_conns_btn.connect_clicked(with_viewer!(weak, |this| this.do_save_connections()));
         generate_sql_btn.connect_clicked(with_viewer!(weak, |this| this.do_generate_sql()));
         run_btn.connect_clicked(with_viewer!(weak, |this| this.do_run_query()));
         this.export_csv_btn
             .connect_clicked(with_viewer!(weak, |this| this.do_export_csv()));
+
+        let w = weak.clone();
+        let run_shortcut = gtk::Shortcut::new(
+            gtk::ShortcutTrigger::parse_string("<Control>Return"),
+            Some(gtk::CallbackAction::new(move |_, _| {
+                if let Some(this) = w.upgrade() {
+                    this.do_run_query();
+                }
+                glib::Propagation::Stop
+            })),
+        );
+        let shortcuts = gtk::ShortcutController::new();
+        shortcuts.add_shortcut(run_shortcut);
+        sql_view.add_controller(shortcuts);
+
+        let w = weak.clone();
+        this.sql_buffer.connect_changed(move |_| {
+            if let Some(this) = w.upgrade() {
+                this.on_sql_edited();
+            }
+        });
 
         let right_click = gtk::GestureClick::builder()
             .button(gdk::BUTTON_SECONDARY)
@@ -358,11 +469,13 @@ impl SqlViewer {
         this.fixed.add_controller(left_click);
 
         this.refresh_joins_panel();
+        this.update_connection_state();
+        this.load_connections();
 
         root.connect_destroy(move |_| {
             let _ = &this;
         });
-        root.upcast()
+        (root.upcast(), weak)
     }
 
     fn set_error(&self, message: &str) {
@@ -454,18 +567,79 @@ impl SqlViewer {
     fn joins_changed(self: &Rc<Self>) {
         self.refresh_joins_panel();
         self.link_lines.queue_draw();
+        self.canvas_changed();
+    }
+
+    /// Runs `f` with widget signal handlers muted (see `syncing`).
+    fn quietly<T>(&self, f: impl FnOnce() -> T) -> T {
+        let was = self.syncing.replace(true);
+        let result = f();
+        self.syncing.set(was);
+        result
     }
 
     fn remove_join(self: &Rc<Self>, join: &Rc<Join>) {
         self.joins.borrow_mut().retain(|j| !Rc::ptr_eq(j, join));
-        join.left.anchor.set_active(false);
-        join.right.anchor.set_active(false);
+        let joins = self.joins.borrow();
+        self.quietly(|| {
+            for anchor in [&join.left.anchor, &join.right.anchor] {
+                // An anchor stays lit while another join still uses it.
+                if !joins
+                    .iter()
+                    .any(|j| j.left.anchor == *anchor || j.right.anchor == *anchor)
+                {
+                    anchor.set_active(false);
+                }
+            }
+        });
+        drop(joins);
         self.joins_changed();
+    }
+
+    /// Joins two columns without going through the anchors' click flow.
+    /// Returns false when a column is missing or the join already exists.
+    fn link_columns(
+        &self,
+        left: &Rc<TableCard>,
+        left_col: &str,
+        right: &Rc<TableCard>,
+        right_col: &str,
+    ) -> bool {
+        let (Some(l), Some(r)) = (left.column(left_col), right.column(right_col)) else {
+            return false;
+        };
+        if Rc::ptr_eq(left, right) {
+            return false;
+        }
+        let exists = self.joins.borrow().iter().any(|j| {
+            (j.left.anchor == l.anchor && j.right.anchor == r.anchor)
+                || (j.left.anchor == r.anchor && j.right.anchor == l.anchor)
+        });
+        if exists {
+            return false;
+        }
+        self.quietly(|| {
+            l.anchor.set_active(true);
+            r.anchor.set_active(true);
+        });
+        let side = |card: &Rc<TableCard>, col: &ColumnWidgets| Side {
+            card: Rc::clone(card),
+            col: col.name.clone(),
+            anchor: col.anchor.clone(),
+        };
+        self.joins.borrow_mut().push(Rc::new(Join {
+            left: side(left, l),
+            right: side(right, r),
+        }));
+        true
     }
 
     // --- Join anchors ---
 
     fn on_anchor_toggled(self: &Rc<Self>, side: Side) {
+        if self.syncing.get() {
+            return;
+        }
         let btn = side.anchor.clone();
         if !btn.is_active() {
             let removed: Vec<Rc<Join>> = {
@@ -522,46 +696,76 @@ impl SqlViewer {
         self: &Rc<Self>,
         table: &str,
         columns: &[(String, String)],
+        foreign_keys: Vec<ForeignKey>,
     ) -> Rc<TableCard> {
         let frame = gtk::Frame::new(None);
         frame.add_css_class("card");
-        frame.set_size_request(240, 160);
+        frame.set_size_request(220, -1);
 
         let vbox = gtk::Box::new(gtk::Orientation::Vertical, 6);
-        vbox.set_margin_top(10);
+        vbox.set_margin_top(8);
         vbox.set_margin_bottom(10);
         vbox.set_margin_start(10);
-        vbox.set_margin_end(10);
+        vbox.set_margin_end(6);
 
         let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let table_icon = gtk::Image::from_icon_name("view-grid-symbolic");
+        table_icon.add_css_class("dim-label");
         let name_lbl = heading(table);
         name_lbl.set_hexpand(true);
+        name_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        let count_lbl = gtk::Label::new(Some(&columns.len().to_string()));
+        count_lbl.add_css_class("dim-label");
+        count_lbl.add_css_class("caption");
+        count_lbl.set_tooltip_text(Some("Columns"));
         let close_btn = close_button();
+        close_btn.set_tooltip_text(Some("Remove from the canvas"));
+        header.append(&table_icon);
         header.append(&name_lbl);
+        header.append(&count_lbl);
         header.append(&close_btn);
         header.set_cursor_from_name(Some("move"));
 
-        let fields_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
-        fields_box.set_margin_end(10);
+        let fields_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        fields_box.set_margin_end(4);
         let mut column_widgets = Vec::new();
         for (col_name, col_type) in columns {
-            let label = if col_type.is_empty() {
-                col_name.clone()
-            } else {
-                format!("{col_name}  ·  {col_type}")
-            };
-            let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-            let check = gtk::CheckButton::with_label(&label);
+            let references = foreign_keys.iter().find(|fk| fk.column == *col_name);
+            let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            let check = gtk::CheckButton::new();
             check.set_active(true);
+            check.set_tooltip_text(Some("Select this column"));
+            let name_lbl = gtk::Label::builder()
+                .label(col_name)
+                .xalign(0.0)
+                .hexpand(true)
+                .build();
+            // Clicking the name toggles the check box, like a check button label.
+            check.set_child(Some(&name_lbl));
             check.set_hexpand(true);
+            let type_text = match references {
+                Some(fk) => format!("{col_type} → {}", fk.ref_table),
+                None => col_type.clone(),
+            };
+            let type_lbl = gtk::Label::new(Some(&type_text));
+            type_lbl.add_css_class("dim-label");
+            type_lbl.add_css_class("caption");
+            if let Some(fk) = references {
+                row_box.set_tooltip_text(Some(&format!(
+                    "References {}.{}",
+                    fk.ref_table, fk.ref_column
+                )));
+            }
             let anchor = gtk::ToggleButton::new();
             anchor.set_icon_name("insert-link-symbolic");
             anchor.add_css_class("flat");
             anchor.add_css_class("circular");
+            anchor.set_valign(gtk::Align::Center);
             anchor.set_tooltip_text(Some(
                 "Link this column to another table's column to join them",
             ));
             row_box.append(&check);
+            row_box.append(&type_lbl);
             row_box.append(&anchor);
             fields_box.append(&row_box);
             column_widgets.push(ColumnWidgets {
@@ -577,10 +781,17 @@ impl SqlViewer {
         }
 
         let fields_scroll = gtk::ScrolledWindow::new();
-        fields_scroll.set_max_content_height(220);
-        fields_scroll.set_propagate_natural_height(columns.len() <= 8);
+        fields_scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
+        // `gtk::Fixed` sizes cards to their minimum, so that is what must
+        // fit every row (up to the cap).
+        let rows_height = i32::try_from(columns.len())
+            .unwrap_or(i32::MAX)
+            .saturating_mul(CARD_ROW_HEIGHT);
+        fields_scroll.set_min_content_height(rows_height.min(CARD_MAX_LIST_HEIGHT));
+        fields_scroll.set_max_content_height(CARD_MAX_LIST_HEIGHT);
+        fields_scroll.set_propagate_natural_height(true);
+        fields_scroll.set_propagate_natural_width(true);
         fields_scroll.set_vexpand(true);
-        fields_scroll.set_overlay_scrolling(false);
         fields_scroll.set_child(Some(&fields_box));
 
         vbox.append(&header);
@@ -606,11 +817,18 @@ impl SqlViewer {
             table: table.to_string(),
             frame: frame.clone(),
             columns: column_widgets,
+            foreign_keys,
         });
         let weak = Rc::downgrade(self);
         let weak_card = Rc::downgrade(&card);
 
         for col in &card.columns {
+            let w = weak.clone();
+            col.check.connect_toggled(move |_| {
+                if let Some(this) = w.upgrade() {
+                    this.canvas_changed();
+                }
+            });
             let (w, wc, col_name) = (weak.clone(), weak_card.clone(), col.name.clone());
             col.anchor.connect_toggled(move |btn| {
                 if let (Some(this), Some(card)) = (w.upgrade(), wc.upgrade()) {
@@ -709,6 +927,7 @@ impl SqlViewer {
         }
         self.link_lines.queue_draw();
         self.update_canvas_placeholder();
+        self.canvas_changed();
     }
 
     fn update_canvas_placeholder(&self) {
@@ -716,16 +935,61 @@ impl SqlViewer {
             .set_visible(self.table_cards.borrow().is_empty());
     }
 
-    fn add_table_card(self: &Rc<Self>, table: &str, x: f64, y: f64) {
-        let columns = match self.db.borrow_mut().list_columns(table) {
-            Ok(c) => c,
-            Err(e) => return self.set_error(e.message()),
+    /// Puts a card on the canvas, without joins.
+    fn place_table_card(self: &Rc<Self>, table: &str, x: f64, y: f64) -> Option<Rc<TableCard>> {
+        let (columns, foreign_keys) = {
+            let mut db = self.db.borrow_mut();
+            let columns = db.list_columns(table);
+            // Joins can still be drawn by hand if the keys can't be read.
+            (columns, db.list_foreign_keys(table).unwrap_or_default())
         };
-        let card = self.build_table_card(table, &columns);
+        let columns = match columns {
+            Ok(c) => c,
+            Err(e) => {
+                self.set_error(e.message());
+                return None;
+            }
+        };
+        let card = self.build_table_card(table, &columns, foreign_keys);
         self.fixed.put(&card.frame, x, y);
-        self.table_cards.borrow_mut().push(card);
+        self.table_cards.borrow_mut().push(Rc::clone(&card));
         self.update_canvas_placeholder();
-        self.set_status(&format!("Added “{table}” to the canvas."));
+        Some(card)
+    }
+
+    /// Free spot for a card placed by the code: a grid, row after row.
+    fn next_card_position(&self) -> (f64, f64) {
+        let n = self.table_cards.borrow().len();
+        (30.0 + (n % 3) as f64 * 340.0, 30.0 + (n / 3) as f64 * 300.0)
+    }
+
+    fn add_table_card(self: &Rc<Self>, table: &str, x: f64, y: f64) {
+        let Some(card) = self.place_table_card(table, x, y) else {
+            return;
+        };
+        let cards = self.table_cards.borrow().clone();
+        let fks: Vec<(&str, &[ForeignKey])> = cards
+            .iter()
+            .map(|c| (c.table.as_str(), c.foreign_keys.as_slice()))
+            .collect();
+        let new = cards.len() - 1;
+        let mut linked = Vec::new();
+        for j in logic::foreign_key_joins(&fks, new) {
+            let (l, r) = (&cards[j.left_table], &cards[j.right_table]);
+            if self.link_columns(l, &j.left_column, r, &j.right_column) {
+                let other = if Rc::ptr_eq(l, &card) { r } else { l };
+                linked.push(other.table.clone());
+            }
+        }
+        self.joins_changed();
+        if linked.is_empty() {
+            self.set_status(&format!("Added “{table}” to the canvas."));
+        } else {
+            self.set_status(&format!(
+                "Added “{table}”, joined to {} by foreign key.",
+                linked.join(", ")
+            ));
+        }
     }
 
     fn on_canvas_right_click(self: &Rc<Self>, x: f64, y: f64) {
@@ -740,20 +1004,78 @@ impl SqlViewer {
 
     fn show_table_picker(self: &Rc<Self>, x: f64, y: f64) {
         let popover = popover_at(&self.fixed, x, y);
+        let vbox = gtk::Box::new(gtk::Orientation::Vertical, 6);
 
+        let on_canvas: Vec<String> = self
+            .table_cards
+            .borrow()
+            .iter()
+            .map(|c| c.table.clone())
+            .collect();
+        let tables: Vec<String> = self
+            .tables_cache
+            .borrow()
+            .iter()
+            .filter(|t| !on_canvas.contains(t))
+            .cloned()
+            .collect();
+        if tables.is_empty() {
+            vbox.append(&hint("Every table is already on the canvas."));
+            popover.set_child(Some(&vbox));
+            popover.popup();
+            return;
+        }
+
+        let search = gtk::SearchEntry::builder()
+            .placeholder_text("Search tables…")
+            .build();
         let listbox = gtk::ListBox::new();
-        listbox.add_css_class("boxed-list");
-        let tables = self.tables_cache.borrow().clone();
+        listbox.add_css_class("navigation-sidebar");
         for table in &tables {
-            let row_lbl = gtk::Label::builder().label(table).xalign(0.0).build();
-            row_lbl.set_margin_top(6);
-            row_lbl.set_margin_bottom(6);
-            row_lbl.set_margin_start(10);
-            row_lbl.set_margin_end(10);
+            let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            row_box.append(&gtk::Image::from_icon_name("view-grid-symbolic"));
+            row_box.append(&gtk::Label::builder().label(table).xalign(0.0).build());
             let row = gtk::ListBoxRow::new();
-            row.set_child(Some(&row_lbl));
+            row.set_child(Some(&row_box));
             listbox.append(&row);
         }
+
+        let filter_tables = tables.clone();
+        listbox.set_filter_func(glib::clone!(
+            #[weak]
+            search,
+            #[upgrade_or]
+            true,
+            move |row| {
+                let query = search.text().to_lowercase();
+                usize::try_from(row.index())
+                    .ok()
+                    .and_then(|i| filter_tables.get(i))
+                    .is_some_and(|t| t.to_lowercase().contains(&query))
+            }
+        ));
+        search.connect_search_changed(glib::clone!(
+            #[weak]
+            listbox,
+            move |_| listbox.invalidate_filter()
+        ));
+        // Enter adds the first table still shown.
+        search.connect_activate(glib::clone!(
+            #[weak]
+            listbox,
+            move |_| {
+                let mut child = listbox.first_child();
+                while let Some(widget) = child {
+                    if let Some(row) = widget.downcast_ref::<gtk::ListBoxRow>()
+                        && row.is_child_visible()
+                    {
+                        row.activate();
+                        return;
+                    }
+                    child = widget.next_sibling();
+                }
+            }
+        ));
 
         let weak = Rc::downgrade(self);
         listbox.connect_row_activated(glib::clone!(
@@ -771,14 +1093,17 @@ impl SqlViewer {
         ));
 
         let list_scroll = gtk::ScrolledWindow::new();
-        list_scroll.set_max_content_height(240);
+        list_scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
+        list_scroll.set_max_content_height(280);
         list_scroll.set_propagate_natural_height(true);
-        list_scroll.set_min_content_width(220);
-        list_scroll.set_max_content_width(480);
+        list_scroll.set_min_content_width(240);
         list_scroll.set_propagate_natural_width(true);
         list_scroll.set_child(Some(&listbox));
-        popover.set_child(Some(&list_scroll));
+        vbox.append(&search);
+        vbox.append(&list_scroll);
+        popover.set_child(Some(&vbox));
         popover.popup();
+        search.grab_focus();
     }
 
     // --- Join editor (click a join line to change its columns) ---
@@ -907,26 +1232,181 @@ impl SqlViewer {
             .collect();
         let kind = self.db.borrow().kind().unwrap_or(DbKind::Sqlite);
         logic::build_select(kind, &tables, &joins, MAX_RESULT_ROWS)
+            .map(|sql| sql_format::format(&sql))
+    }
+
+    fn sql_text(&self) -> String {
+        let (start, end) = self.sql_buffer.bounds();
+        self.sql_buffer.text(&start, &end, true).to_string()
+    }
+
+    /// Writes generated SQL to the editor; later canvas edits keep it in sync.
+    fn set_generated_sql(&self, sql: &str) {
+        self.quietly(|| self.sql_buffer.set_text(sql));
+        *self.generated_sql.borrow_mut() = sql.to_string();
+    }
+
+    /// Rewrites the query from the canvas, unless the user has edited it.
+    fn canvas_changed(&self) {
+        if self.syncing.get() {
+            return;
+        }
+        let current = self.sql_text();
+        if !current.trim().is_empty() && current != *self.generated_sql.borrow() {
+            return;
+        }
+        match self.build_query() {
+            Ok(sql) => self.set_generated_sql(&sql),
+            Err(_) if self.table_cards.borrow().is_empty() => self.set_generated_sql(""),
+            // Incomplete canvas (e.g. a table not linked yet): keep the last query.
+            Err(_) => {}
+        }
     }
 
     fn do_generate_sql(&self) {
         match self.build_query() {
             Ok(sql) => {
-                self.sql_buffer.set_text(&sql);
+                self.set_generated_sql(&sql);
                 self.set_status("SQL generated from the canvas — edit it, then Run Query.");
             }
             Err(e) => self.set_error(e.message()),
         }
     }
 
+    // --- Query → canvas ---
+
+    fn on_sql_edited(self: &Rc<Self>) {
+        if self.syncing.get() {
+            return;
+        }
+        let serial = self.sql_edit_serial.get().wrapping_add(1);
+        self.sql_edit_serial.set(serial);
+        let weak = Rc::downgrade(self);
+        glib::timeout_add_local_once(SQL_SYNC_DELAY, move || {
+            if let Some(this) = weak.upgrade()
+                && this.sql_edit_serial.get() == serial
+            {
+                this.draw_sql_on_canvas();
+            }
+        });
+    }
+
+    /// Redraws the canvas from the typed query when it is a plain SELECT on
+    /// known tables; anything else leaves the canvas alone.
+    fn draw_sql_on_canvas(self: &Rc<Self>) {
+        let Some(kind) = self.db.borrow().kind() else {
+            return;
+        };
+        let sql = self.sql_text();
+        if sql.trim().is_empty() || sql == *self.generated_sql.borrow() {
+            return;
+        }
+        let Ok(parsed) = logic::parse_select(kind, &sql) else {
+            return;
+        };
+        let known: Vec<Option<String>> = {
+            let cache = self.tables_cache.borrow();
+            parsed
+                .tables
+                .iter()
+                .map(|t| {
+                    cache
+                        .iter()
+                        .find(|c| **c == t.table)
+                        .or_else(|| cache.iter().find(|c| c.eq_ignore_ascii_case(&t.table)))
+                        .cloned()
+                })
+                .collect()
+        };
+        if known.iter().all(Option::is_none) {
+            return;
+        }
+        self.quietly(|| self.apply_parsed_select(&parsed, &known));
+        self.refresh_joins_panel();
+        self.link_lines.queue_draw();
+        self.update_canvas_placeholder();
+
+        let unknown: Vec<&str> = parsed
+            .tables
+            .iter()
+            .zip(&known)
+            .filter(|(_, k)| k.is_none())
+            .map(|(t, _)| t.table.as_str())
+            .collect();
+        if unknown.is_empty() {
+            self.set_status("Canvas redrawn from the SQL query.");
+        } else {
+            self.set_error(&format!(
+                "Unknown table(s) in the query: {}",
+                unknown.join(", ")
+            ));
+        }
+    }
+
+    /// `known[i]` is the database's name for `parsed.tables[i]`, if it exists.
+    fn apply_parsed_select(self: &Rc<Self>, parsed: &ParsedSelect, known: &[Option<String>]) {
+        let stale: Vec<Rc<TableCard>> = self
+            .table_cards
+            .borrow()
+            .iter()
+            .filter(|c| !known.iter().flatten().any(|k| *k == c.table))
+            .cloned()
+            .collect();
+        for card in &stale {
+            self.remove_table_card(card);
+        }
+        for join in self.joins.borrow_mut().drain(..) {
+            join.left.anchor.set_active(false);
+            join.right.anchor.set_active(false);
+        }
+        self.pending_link.borrow_mut().take();
+
+        let cards: Vec<Option<Rc<TableCard>>> = known
+            .iter()
+            .map(|name| {
+                let name = name.as_ref()?;
+                let existing = self
+                    .table_cards
+                    .borrow()
+                    .iter()
+                    .find(|c| c.table == *name)
+                    .cloned();
+                existing.or_else(|| {
+                    let (x, y) = self.next_card_position();
+                    self.place_table_card(name, x, y)
+                })
+            })
+            .collect();
+
+        for (table, card) in parsed.tables.iter().zip(&cards) {
+            let Some(card) = card else { continue };
+            for col in &card.columns {
+                let selected = match &table.columns {
+                    None => true,
+                    Some(names) => names
+                        .iter()
+                        .chain(&parsed.unqualified_columns)
+                        .any(|n| n.eq_ignore_ascii_case(&col.name)),
+                };
+                col.check.set_active(selected);
+            }
+        }
+        for j in &parsed.joins {
+            if let (Some(Some(l)), Some(Some(r))) =
+                (cards.get(j.left_table), cards.get(j.right_table))
+            {
+                self.link_columns(l, &j.left_column, r, &j.right_column);
+            }
+        }
+    }
+
     fn do_run_query(&self) {
-        let (start, end) = self.sql_buffer.bounds();
-        let mut sql = self.sql_buffer.text(&start, &end, true).trim().to_string();
+        let mut sql = self.sql_text().trim().to_string();
         if sql.is_empty() {
             // Nothing typed yet — build it from the canvas as a convenience.
             match self.build_query() {
                 Ok(built) => {
-                    self.sql_buffer.set_text(&built);
+                    self.set_generated_sql(&built);
                     sql = built;
                 }
                 Err(e) => return self.set_error(e.message()),
@@ -945,6 +1425,26 @@ impl SqlViewer {
         let status = format!("{} row(s){truncated} — {}", rows.len(), timestamp());
         self.render_results((columns, rows));
         self.set_status(&status);
+        self.scroll_to_results();
+    }
+
+    /// Scrolls the page so the results header is at the top, once the new
+    /// results have been laid out.
+    fn scroll_to_results(&self) {
+        let header = self.results_header.clone();
+        glib::idle_add_local_once(move || {
+            let Some(page) = header
+                .ancestor(gtk::ScrolledWindow::static_type())
+                .and_downcast::<gtk::ScrolledWindow>()
+            else {
+                return;
+            };
+            if let Some(content) = page.child()
+                && let Some(point) = header.compute_point(&content, &graphene::Point::zero())
+            {
+                page.vadjustment().set_value(f64::from(point.y()) - 12.0);
+            }
+        });
     }
 
     fn render_results(&self, (columns, rows): QueryResult) {
@@ -1013,12 +1513,180 @@ impl SqlViewer {
 
     // --- Connections ---
 
-    fn do_connect(&self) {
-        let idx = self.conn_dropdown.selected();
-        let connections = self.connections.borrow();
-        let Some(cfg) = connections.get(idx as usize) else {
+    fn load_connections(&self) {
+        if let Some(path) = self.store.last_path() {
+            self.open_connections_file(&path);
+        }
+    }
+
+    fn file_name(path: &Path) -> String {
+        path.file_name()
+            .unwrap_or(path.as_os_str())
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    fn open_connections_file(&self, path: &Path) {
+        let connections = match self.store.load(path) {
+            Ok(connections) => connections,
+            Err(e) => {
+                return self.set_error(&format!(
+                    "Cannot open “{}”: {}",
+                    path.display(),
+                    e.message()
+                ));
+            }
+        };
+        let names: Vec<&str> = connections.iter().map(|c| c.name.as_str()).collect();
+        self.conn_model.splice(0, self.conn_model.n_items(), &names);
+        self.connect_btn.set_sensitive(!connections.is_empty());
+        self.set_status(&format!(
+            "Opened “{}” — {} connection(s).",
+            Self::file_name(path),
+            connections.len()
+        ));
+        *self.connections.borrow_mut() = connections;
+        self.update_connection_state();
+        *self.connections_file.borrow_mut() = Some(path.to_path_buf());
+        self.unsaved.set(false);
+        let _ = self.store.set_last_path(path);
+    }
+
+    /// True when the connections were written.
+    fn save_connections_file(&self, path: &Path) -> bool {
+        if let Err(e) = self.store.save(path, &self.connections.borrow()) {
+            self.set_error(&format!(
+                "Cannot save “{}”: {}",
+                path.display(),
+                e.message()
+            ));
+            return false;
+        }
+        self.set_status(&format!(
+            "Connections saved to “{}”.",
+            Self::file_name(path)
+        ));
+        *self.connections_file.borrow_mut() = Some(path.to_path_buf());
+        self.unsaved.set(false);
+        let _ = self.store.set_last_path(path);
+        true
+    }
+
+    fn json_file_dialog(&self, title: &str) -> gtk::FileDialog {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some("JSON files"));
+        filter.add_pattern("*.json");
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let dialog = gtk::FileDialog::builder()
+            .title(title)
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&filter)
+            .build();
+        match self.connections_file.borrow().as_deref() {
+            Some(path) => dialog.set_initial_file(Some(&gio::File::for_path(path))),
+            None => dialog.set_initial_name(Some("connections.json")),
+        }
+        dialog
+    }
+
+    fn window(&self) -> Option<gtk::Window> {
+        self.connect_btn.root().and_downcast::<gtk::Window>()
+    }
+
+    fn do_open_connections(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        Rc::clone(self).confirm_leave(Box::new(move || {
+            let Some(this) = weak.upgrade() else { return };
+            let weak = weak.clone();
+            this.json_file_dialog("Open Connections").open(
+                this.window().as_ref(),
+                gio::Cancellable::NONE,
+                move |res| {
+                    if let (Some(this), Some(path)) =
+                        (weak.upgrade(), res.ok().and_then(|f| f.path()))
+                    {
+                        this.open_connections_file(&path);
+                    }
+                },
+            );
+        }));
+    }
+
+    fn do_save_connections(self: &Rc<Self>) {
+        let current = self.connections_file.borrow().clone();
+        match current {
+            Some(path) => {
+                self.save_connections_file(&path);
+            }
+            None => self.ask_where_to_save(Box::new(|| {})),
+        }
+    }
+
+    /// Asks for a file, saves to it, then calls `then`. Cancelling skips both.
+    fn ask_where_to_save(self: &Rc<Self>, then: Box<dyn FnOnce()>) {
+        let weak = Rc::downgrade(self);
+        self.json_file_dialog("Save Connections").save(
+            self.window().as_ref(),
+            gio::Cancellable::NONE,
+            move |res| {
+                if let (Some(this), Some(path)) = (weak.upgrade(), res.ok().and_then(|f| f.path()))
+                    && this.save_connections_file(&path)
+                {
+                    then();
+                }
+            },
+        );
+    }
+
+    fn update_connection_state(&self) {
+        let connected = self.db.borrow().is_connected();
+        let lbl = &self.conn_state_lbl;
+        if connected {
+            lbl.set_text("● Connected");
+            lbl.remove_css_class("dim-label");
+            lbl.add_css_class("success");
+            self.connect_btn.set_label("Disconnect");
+            self.connect_btn.remove_css_class("suggested-action");
+        } else {
+            lbl.set_text("○ Not connected");
+            lbl.remove_css_class("success");
+            lbl.add_css_class("dim-label");
+            self.connect_btn.set_label("Connect");
+            self.connect_btn.add_css_class("suggested-action");
+        }
+        // Switching connection while connected would leave the canvas stale.
+        self.conn_dropdown
+            .set_sensitive(!connected && self.conn_model.n_items() > 0);
+    }
+
+    fn do_connect(self: &Rc<Self>) {
+        if self.db.borrow().is_connected() {
+            self.db.borrow_mut().close();
+            self.tables_cache.borrow_mut().clear();
+            self.update_connection_state();
+            return self.set_status("Disconnected.");
+        }
+        let idx = self.conn_dropdown.selected() as usize;
+        let Some(needs_password) = self
+            .connections
+            .borrow()
+            .get(idx)
+            .map(ConnectionConfig::needs_password)
+        else {
             return self.set_error("Create a connection first.");
         };
+        if needs_password {
+            self.ask_password(idx);
+        } else {
+            self.connect_to(idx);
+        }
+    }
+
+    fn connect_to(&self, idx: usize) {
+        let mut connections = self.connections.borrow_mut();
+        let cfg = &mut connections[idx];
         let mut db = self.db.borrow_mut();
         let tables = db.connect(cfg).and_then(|_| db.list_tables());
         drop(db);
@@ -1031,8 +1699,49 @@ impl SqlViewer {
                     cfg.name
                 ));
             }
-            Err(e) => self.set_error(e.message()),
+            Err(e) => {
+                // Ask again next time, in case the password was wrong.
+                cfg.forget_password();
+                self.db.borrow_mut().close();
+                self.set_error(e.message());
+            }
         }
+        drop(connections);
+        self.update_connection_state();
+    }
+
+    fn ask_password(self: &Rc<Self>, idx: usize) {
+        let name = self.connections.borrow()[idx].name.clone();
+        let dialog = adw::AlertDialog::new(
+            Some("Password required"),
+            Some(&format!("Enter the password for “{name}”.")),
+        );
+        dialog.add_responses(&[("cancel", "Cancel"), ("connect", "Connect")]);
+        dialog.set_response_appearance("connect", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("connect"));
+        dialog.set_close_response("cancel");
+
+        let entry = gtk::PasswordEntry::builder()
+            .show_peek_icon(true)
+            .activates_default(true)
+            .build();
+        dialog.set_extra_child(Some(&entry));
+
+        let weak = Rc::downgrade(self);
+        dialog.connect_response(
+            Some("connect"),
+            glib::clone!(
+                #[weak]
+                entry,
+                move |_, _| {
+                    let Some(this) = weak.upgrade() else { return };
+                    this.connections.borrow_mut()[idx].set_password(entry.text().into());
+                    this.connect_to(idx);
+                }
+            ),
+        );
+        dialog.present(Some(&self.connect_btn));
+        dialog.set_focus(Some(&entry));
     }
 
     fn open_new_connection_dialog(self: &Rc<Self>) {
@@ -1174,10 +1883,11 @@ impl SqlViewer {
                     "Connection “{name}” created. Click Connect to use it."
                 ));
                 this.connections.borrow_mut().push(config);
+                this.unsaved.set(true);
                 this.conn_dropdown
                     .set_selected(this.conn_model.n_items() - 1);
-                this.conn_dropdown.set_sensitive(true);
                 this.connect_btn.set_sensitive(true);
+                this.update_connection_state();
                 dialog.close();
             }
         ));
@@ -1190,6 +1900,41 @@ impl SqlViewer {
         ));
 
         dialog.present(Some(&self.new_conn_btn));
+    }
+}
+
+impl LeaveGuard for SqlViewer {
+    fn confirm_leave(self: Rc<Self>, proceed: Box<dyn FnOnce()>) {
+        if !self.unsaved.get() {
+            return proceed();
+        }
+        let dialog = adw::AlertDialog::new(
+            Some("Save connections?"),
+            Some("The connection list has unsaved changes. Passwords are never saved."),
+        );
+        dialog.add_responses(&[
+            ("cancel", "Cancel"),
+            ("discard", "Discard"),
+            ("save", "Save…"),
+        ]);
+        dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("save"));
+        dialog.set_close_response("cancel");
+
+        let weak = Rc::downgrade(&self);
+        let proceed = RefCell::new(Some(proceed));
+        dialog.connect_response(None, move |_, response| {
+            let (Some(this), Some(proceed)) = (weak.upgrade(), proceed.take()) else {
+                return;
+            };
+            match response {
+                "save" => this.ask_where_to_save(proceed),
+                "discard" => proceed(),
+                _ => {}
+            }
+        });
+        dialog.present(Some(&self.connect_btn));
     }
 }
 

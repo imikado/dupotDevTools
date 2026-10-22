@@ -20,6 +20,19 @@ impl DbKind {
         }
     }
 
+    /// Stable identifier used when saving connections.
+    pub fn id(self) -> &'static str {
+        match self {
+            DbKind::Sqlite => "sqlite",
+            DbKind::Postgresql => "postgresql",
+            DbKind::Mysql => "mysql",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|k| k.id() == id)
+    }
+
     pub fn default_port(self) -> &'static str {
         match self {
             DbKind::Sqlite => "",
@@ -31,11 +44,24 @@ impl DbKind {
 
 pub type ConnectionParams = BTreeMap<&'static str, String>;
 
+/// Every key a `ConnectionParams` may hold.
+pub const PARAM_KEYS: [&str; 6] = ["path", "host", "port", "database", "user", PASSWORD];
+
+const PASSWORD: &str = "password";
+
 /// One result cell rendered as text; `None` is SQL NULL.
 pub type Cell = Option<String>;
 
 /// (column names, rows)
 pub type QueryResult = (Vec<String>, Vec<Vec<Cell>>);
+
+/// `column` of a table references `ref_table.ref_column`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ForeignKey {
+    pub column: String,
+    pub ref_table: String,
+    pub ref_column: String,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConnectionConfig {
@@ -91,6 +117,28 @@ impl ConnectionForm {
 impl ConnectionConfig {
     pub fn param(&self, key: &str) -> &str {
         self.params.get(key).map(String::as_str).unwrap_or("")
+    }
+
+    /// True for a server connection whose password is unknown: passwords are
+    /// never saved, so they are asked again after a restart.
+    pub fn needs_password(&self) -> bool {
+        self.kind != DbKind::Sqlite && !self.params.contains_key(PASSWORD)
+    }
+
+    pub fn set_password(&mut self, password: String) {
+        self.params.insert(PASSWORD, password);
+    }
+
+    pub fn forget_password(&mut self) {
+        self.params.remove(PASSWORD);
+    }
+
+    /// The params safe to write to disk: all of them but the password.
+    pub fn persisted_params(&self) -> impl Iterator<Item = (&'static str, &str)> {
+        self.params
+            .iter()
+            .filter(|(k, _)| **k != PASSWORD)
+            .map(|(k, v)| (*k, v.as_str()))
     }
 
     pub fn host(&self) -> &str {

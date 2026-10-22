@@ -1,4 +1,4 @@
-use crate::domain::entity::database::{ConnectionConfig, DbKind, QueryResult};
+use crate::domain::entity::database::{ConnectionConfig, DbKind, ForeignKey, QueryResult};
 use crate::domain::error::DomainResult;
 
 /// Access to a SQL database; implemented in `infrastructure::api`.
@@ -12,5 +12,7 @@ pub trait DatabaseRepository {
     fn list_tables(&mut self) -> DomainResult<Vec<String>>;
     /// `(column name, column type)` of a table reported by `list_tables`.
     fn list_columns(&mut self, table: &str) -> DomainResult<Vec<(String, String)>>;
+    /// Foreign keys declared on a table reported by `list_tables`.
+    fn list_foreign_keys(&mut self, table: &str) -> DomainResult<Vec<ForeignKey>>;
     fn close(&mut self);
 }

@@ -25,7 +25,14 @@ impl fmt::Display for DomainError {
 
 impl<E: std::error::Error> From<E> for DomainError {
     fn from(error: E) -> Self {
-        Self(error.to_string())
+        let mut message = error.to_string();
+        let mut source = error.source();
+        while let Some(cause) = source {
+            message.push_str(": ");
+            message.push_str(&cause.to_string());
+            source = cause.source();
+        }
+        Self(message)
     }
 }
 

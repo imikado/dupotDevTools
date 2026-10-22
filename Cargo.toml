@@ -34,6 +34,7 @@ croner = "4"
 rusqlite = { version = "0.40", features = ["bundled"] }
 postgres = "0.19"
 mysql = { version = "28", default-features = false, features = ["minimal-rust"] }
+sqlparser = "0.63.0"
 
 [profile.release]
 lto = true

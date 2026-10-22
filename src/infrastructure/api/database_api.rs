@@ -4,7 +4,7 @@
 use mysql::prelude::Queryable;
 
 use crate::domain::contract::database_repository::DatabaseRepository;
-use crate::domain::entity::database::{Cell, ConnectionConfig, DbKind, QueryResult};
+use crate::domain::entity::database::{Cell, ConnectionConfig, DbKind, ForeignKey, QueryResult};
 use crate::domain::error::{DomainError, DomainResult};
 
 enum Connection {
@@ -118,6 +118,52 @@ impl DatabaseRepository for DatabaseApi {
                 let name = r.get(name_idx).cloned().flatten()?;
                 let kind = r.get(type_idx).cloned().flatten().unwrap_or_default();
                 Some((name, kind))
+            })
+            .collect())
+    }
+
+    fn list_foreign_keys(&mut self, table: &str) -> DomainResult<Vec<ForeignKey>> {
+        let quoted = table.replace('\'', "''");
+        let (sql, idx) = match self.kind() {
+            None => return Ok(vec![]),
+            // id, seq, table, from, to, …
+            Some(DbKind::Sqlite) => (format!("PRAGMA foreign_key_list('{quoted}')"), (3, 2, 4)),
+            Some(DbKind::Postgresql) => (
+                format!(
+                    "SELECT kcu.column_name::text, ccu.table_name::text, ccu.column_name::text \
+                     FROM information_schema.table_constraints tc \
+                     JOIN information_schema.key_column_usage kcu \
+                       ON kcu.constraint_name = tc.constraint_name \
+                      AND kcu.table_schema = tc.table_schema \
+                     JOIN information_schema.constraint_column_usage ccu \
+                       ON ccu.constraint_name = tc.constraint_name \
+                      AND ccu.table_schema = tc.table_schema \
+                     WHERE tc.constraint_type = 'FOREIGN KEY' \
+                       AND tc.table_schema = 'public' AND tc.table_name = '{quoted}'"
+                ),
+                (0, 1, 2),
+            ),
+            Some(DbKind::Mysql) => (
+                format!(
+                    "SELECT COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME \
+                     FROM information_schema.KEY_COLUMN_USAGE \
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{quoted}' \
+                       AND REFERENCED_TABLE_NAME IS NOT NULL"
+                ),
+                (0, 1, 2),
+            ),
+        };
+        let (column, ref_table, ref_column) = idx;
+        let (_, rows) = self.execute(&sql)?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| {
+                Some(ForeignKey {
+                    column: r.get(column).cloned().flatten()?,
+                    ref_table: r.get(ref_table).cloned().flatten()?,
+                    // SQLite leaves `to` NULL when the key targets the primary key.
+                    ref_column: r.get(ref_column).cloned().flatten()?,
+                })
             })
             .collect())
     }

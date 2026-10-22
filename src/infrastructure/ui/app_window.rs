@@ -1,11 +1,12 @@
 use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use adw::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
 
 use crate::domain::entity::app_info::APP;
 use crate::infrastructure::service::feature_loader_service::FeatureLoaderService;
+use crate::infrastructure::ui::feature_contract::LeaveGuard;
 use crate::infrastructure::ui::features::RegisteredFeature;
 
 use super::feature_detail_page;
@@ -253,6 +254,8 @@ struct MainWindow {
     /// `None` is the home page (every tool).
     current_section: Cell<Option<&'static str>>,
     query: RefCell<String>,
+    /// Guard of the open tool page, asked before closing the window.
+    leave_guard: RefCell<Option<Weak<dyn LeaveGuard>>>,
 }
 
 impl MainWindow {
@@ -289,8 +292,10 @@ impl MainWindow {
             loader: FeatureLoaderService::default(),
             current_section: Cell::new(None),
             query: RefCell::default(),
+            leave_guard: RefCell::default(),
         });
         this.install_actions();
+        this.install_leave_guard();
         this.split_view.set_sidebar(Some(&this.build_sidebar()));
         this.split_view.set_content(Some(&this.build_content()));
         this.nav_view
@@ -308,6 +313,36 @@ impl MainWindow {
             }
         });
         self.window.add_action(&about_action);
+    }
+
+    fn install_leave_guard(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        self.nav_view.connect_popped(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.leave_guard.take();
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        self.window.connect_close_request(move |window| {
+            let Some(this) = weak.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
+            let Some(guard) = this.leave_guard.borrow().as_ref().and_then(Weak::upgrade) else {
+                return glib::Propagation::Proceed;
+            };
+            let weak = weak.clone();
+            let window = window.downgrade();
+            guard.confirm_leave(Box::new(move || {
+                if let Some(this) = weak.upgrade() {
+                    this.leave_guard.take();
+                }
+                if let Some(window) = window.upgrade() {
+                    window.close();
+                }
+            }));
+            glib::Propagation::Stop
+        });
     }
 
     fn build_sidebar(self: &Rc<Self>) -> adw::ToolbarView {
@@ -552,10 +587,9 @@ impl MainWindow {
         button.connect_clicked(move |_| {
             if let Some(this) = weak.upgrade() {
                 let instance = (feature.create)();
-                this.nav_view.push(&feature_detail_page::build(
-                    &feature.entity,
-                    instance.as_ref(),
-                ));
+                let (page, guard) = feature_detail_page::build(&feature.entity, instance.as_ref());
+                *this.leave_guard.borrow_mut() = guard;
+                this.nav_view.push(&page);
             }
         });
         button
