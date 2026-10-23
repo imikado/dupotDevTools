@@ -42,21 +42,30 @@ macro_rules! feature {
 
 pub fn registry() -> Vec<RegisteredFeature> {
     vec![
+        feature!(convert::color),
         feature!(convert::html_to_text),
+        feature!(convert::number_base),
         feature!(convert::timestamp),
+        feature!(convert::unit_converter),
         feature!(convert::yaml_json),
         feature!(database::sql_viewer),
         feature!(encoding::base64_encoding),
         feature!(encoding::html_encoding),
         feature!(encoding::jwt_decode),
+        feature!(encoding::jwt_sign),
         feature!(encoding::url_encoding),
         feature!(formating::json_format),
         feature!(formating::sql_format),
         feature!(formating::xml_format),
         feature!(parsing::cron_parser),
+        feature!(parsing::json_query),
+        feature!(parsing::xpath_tester),
+        feature!(string::case_converter),
         feature!(string::hash),
+        feature!(string::password_generator),
         feature!(string::regex_tester),
         feature!(string::text_diff),
+        feature!(string::text_inspector),
         feature!(string::uuid_generator),
     ]
 }

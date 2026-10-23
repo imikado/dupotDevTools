@@ -1,4 +1,5 @@
 mod criteria;
+mod demo;
 pub mod geometry;
 
 use std::cell::{Cell, RefCell};
@@ -160,6 +161,7 @@ struct SqlViewer {
     criteria_grid: gtk::Grid,
     add_criteria_btn: gtk::MenuButton,
     sql_buffer: gtk::TextBuffer,
+    sql_toggle: gtk::ToggleButton,
     results_toggle: gtk::ToggleButton,
     results_lbl: gtk::Label,
     results_scroll: gtk::ScrolledWindow,
@@ -638,6 +640,7 @@ impl SqlViewer {
             criteria_grid,
             add_criteria_btn,
             sql_buffer,
+            sql_toggle: sql_toggle.clone(),
             results_toggle,
             results_lbl,
             results_scroll,
@@ -734,7 +737,11 @@ impl SqlViewer {
         this.setup_add_criteria_menu();
         this.rebuild_criteria_grid();
         this.update_connection_state();
-        this.load_connections();
+        if crate::infrastructure::ui::demo::active() {
+            this.start_demo();
+        } else {
+            this.load_connections();
+        }
 
         root.connect_destroy(move |_| {
             let _ = &this;
@@ -1319,7 +1326,7 @@ impl SqlViewer {
         self.show_table_picker(x, y);
     }
 
-    fn show_table_picker(self: &Rc<Self>, x: f64, y: f64) {
+    fn show_table_picker(self: &Rc<Self>, x: f64, y: f64) -> gtk::Popover {
         let popover = popover_at(&self.fixed, x, y);
         let vbox = gtk::Box::new(gtk::Orientation::Vertical, 6);
 
@@ -1340,7 +1347,7 @@ impl SqlViewer {
             vbox.append(&hint("Every table is already on the canvas."));
             popover.set_child(Some(&vbox));
             popover.popup();
-            return;
+            return popover;
         }
 
         let search = gtk::SearchEntry::builder()
@@ -1423,6 +1430,7 @@ impl SqlViewer {
         popover.set_child(Some(&vbox));
         popover.popup();
         search.grab_focus();
+        popover
     }
 
     // --- Join editor (click a join line to change its columns) ---
@@ -2099,7 +2107,7 @@ impl SqlViewer {
         dialog.set_focus(Some(&entry));
     }
 
-    fn open_new_connection_dialog(self: &Rc<Self>) {
+    fn open_new_connection_dialog(self: &Rc<Self>) -> adw::Dialog {
         let dialog = adw::Dialog::new();
         dialog.set_title("New Database Connection");
         dialog.set_content_width(420);
@@ -2255,6 +2263,7 @@ impl SqlViewer {
         ));
 
         dialog.present(Some(&self.new_conn_btn));
+        dialog
     }
 }
 

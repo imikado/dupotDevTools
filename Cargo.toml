@@ -1,6 +1,6 @@
 [package]
 name = "dupot-dev-tools"
-version = "2.1.4"
+version = "2.2.0"
 edition = "2024"
 description = "The developer's Swiss Army knife for the Linux desktop"
 license = "LGPL-2.1-only"
@@ -38,6 +38,13 @@ sqlparser = "0.63.0"
 tokio-postgres-rustls = "0.14.0"
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 ureq = "3"
+ring = "0.17"
+serde_json_path = "0.7"
+sxd-document = "0.3"
+sxd-xpath = "0.4"
+jaq-core = "3"
+jaq-std = "3"
+jaq-json = "2"
 
 [profile.release]
 lto = true

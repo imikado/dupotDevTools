@@ -235,6 +235,24 @@ impl InputOutputWidget {
         self.inner.extra_box.append(widget);
     }
 
+    /// Adds an "Examples…" dropdown whose entries replace the input.
+    pub fn add_examples(&self, examples: &'static [&'static str]) {
+        let labels: Vec<&str> = std::iter::once("Examples…")
+            .chain(examples.iter().copied())
+            .collect();
+        let dropdown = gtk::DropDown::from_strings(&labels);
+        let weak = self.weak();
+        dropdown.connect_selected_notify(move |dropdown| {
+            let example = (dropdown.selected() as usize)
+                .checked_sub(1)
+                .and_then(|i| examples.get(i));
+            if let (Some(example), Some(tool)) = (example, Self::upgrade(&weak)) {
+                tool.set_input(example);
+            }
+        });
+        self.add_extra_widget(&dropdown);
+    }
+
     pub fn input(&self) -> String {
         self.inner.input_view.text()
     }

@@ -11,7 +11,7 @@ use crate::infrastructure::service::feature_loader_service::FeatureLoaderService
 use crate::infrastructure::ui::feature_contract::LeaveGuard;
 use crate::infrastructure::ui::features::RegisteredFeature;
 
-use super::feature_detail_page;
+use super::{demo, feature_detail_page};
 
 const APP_ID: &str = APP.id;
 const APP_NAME: &str = APP.name;
@@ -251,6 +251,7 @@ struct MainWindow {
     toast_overlay: adw::ToastOverlay,
     nav_view: adw::NavigationView,
     split_view: adw::OverlaySplitView,
+    sidebar_list: gtk::ListBox,
     content_bin: adw::Bin,
     content_title: adw::WindowTitle,
     loader: FeatureLoaderService,
@@ -293,6 +294,7 @@ impl MainWindow {
             toast_overlay,
             nav_view,
             split_view,
+            sidebar_list: gtk::ListBox::new(),
             content_bin: adw::Bin::new(),
             content_title: adw::WindowTitle::new("", ""),
             loader: FeatureLoaderService::default(),
@@ -307,8 +309,36 @@ impl MainWindow {
         this.nav_view
             .push(&adw::NavigationPage::new(&this.split_view, APP_NAME));
         this.refresh();
-        this.check_for_update();
+        if demo::active() {
+            this.run_demo();
+        } else {
+            this.check_for_update();
+        }
         this
+    }
+
+    /// Home and section screenshots, then opens the SQL viewer, which goes
+    /// on with its own part of the demo.
+    fn run_demo(self: &Rc<Self>) {
+        let this = Rc::clone(self);
+        glib::spawn_future_local(async move {
+            demo::pause(1500).await;
+            demo::shot("home").await;
+            let database = this.loader.sections().iter().position(|s| *s == "database");
+            if let Some(row) = database.and_then(|i| this.sidebar_list.row_at_index(i as i32 + 1)) {
+                this.sidebar_list.select_row(Some(&row));
+            }
+            demo::shot("database_section").await;
+            let sql_viewer = this
+                .loader
+                .all_features()
+                .into_iter()
+                .find(|f| f.entity.name == "sql_viewer");
+            match sql_viewer {
+                Some(feature) => this.open_feature(&feature),
+                None => demo::done(),
+            }
+        });
     }
 
     /// Looks up the latest release in the background and, when it is newer
@@ -396,7 +426,7 @@ impl MainWindow {
             .build();
         header_bar.pack_end(&menu_btn);
 
-        let list = gtk::ListBox::new();
+        let list = self.sidebar_list.clone();
         list.set_selection_mode(gtk::SelectionMode::Single);
         list.add_css_class("navigation-sidebar");
 
@@ -623,13 +653,17 @@ impl MainWindow {
         let weak = Rc::downgrade(self);
         button.connect_clicked(move |_| {
             if let Some(this) = weak.upgrade() {
-                let instance = (feature.create)();
-                let (page, guard) = feature_detail_page::build(&feature.entity, instance.as_ref());
-                *this.leave_guard.borrow_mut() = guard;
-                this.nav_view.push(&page);
+                this.open_feature(&feature);
             }
         });
         button
+    }
+
+    fn open_feature(&self, feature: &RegisteredFeature) {
+        let instance = (feature.create)();
+        let (page, guard) = feature_detail_page::build(&feature.entity, instance.as_ref());
+        *self.leave_guard.borrow_mut() = guard;
+        self.nav_view.push(&page);
     }
 }
 

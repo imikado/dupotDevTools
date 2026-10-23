@@ -104,6 +104,32 @@
           '';
         };
 
+        # update_screenshots.sh: runs the app's scripted demo in a headless
+        # Wayland compositor and captures it.
+        devShells.screenshots = pkgs.mkShell {
+          inputsFrom = [ dupot-dev-tools ];
+          packages = with pkgs; [
+            cargo
+            rustc
+            sway
+            grim
+            wf-recorder
+            ffmpeg
+            sqlite
+            dbus
+          ];
+
+          # Fixed fonts, so the screenshots don't depend on the machine.
+          FONTCONFIG_FILE = pkgs.makeFontsConf {
+            fontDirectories = with pkgs; [ adwaita-fonts cantarell-fonts dejavu_fonts ];
+          };
+
+          shellHook = ''
+            export XDG_DATA_DIRS="${pkgs.adwaita-icon-theme}/share:${pkgs.hicolor-icon-theme}/share:${pkgs.gtksourceview5}/share:${pkgs.gtk4}/share/gsettings-schemas/${pkgs.gtk4.name}:${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:''${XDG_DATA_DIRS:-}"
+            echo "Screenshot environment (headless sway, grim, wf-recorder, ffmpeg)" >&2
+          '';
+        };
+
         devShells.windows = pkgs.mkShell {
           packages = [
             rustWindows

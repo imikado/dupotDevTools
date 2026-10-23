@@ -42,20 +42,29 @@ Dupot Dev Tools gathers all those small everyday utilities in **one desktop app*
 | 🎨 **Formatting** | JSON Formatter | Prettify or minify JSON |
 | | SQL Formatter | Format SQL queries |
 | | XML Formatter | Format XML documents |
-| 🔄 **Convert** | Timestamp ↔ Date | Unix timestamps (s, ms, µs, ns auto-detected) ↔ dates: UTC, local, ISO 8601, RFC 2822, relative time |
+| 🔄 **Convert** | Color Converter | HEX, RGB, HSL, OKLCH, OKLab with color picker; WCAG contrast against white, black or any color |
+| | Number Base | Decimal, hex, octal, binary, two's complement; bitwise expressions like `0xFF & ~0b1010 << 2` |
+| | Timestamp ↔ Date | Unix timestamps (s, ms, µs, ns auto-detected) ↔ dates: UTC, local, ISO 8601, RFC 2822, relative time |
 | | YAML ↔ JSON | Convert in both directions |
 | | HTML to Text | Strip HTML tags to plain text |
+| | Unit Converter | Data sizes (`1.5 GiB`, `250 Mbit`) and durations (`1h30m`, `PT2H`, `01:30:00`) in every unit |
 | 🔐 **Encoding** | Base64 | Encode / decode Base64 |
 | | URL Encoding | Percent-encode / decode |
 | | HTML Entities | Encode / decode HTML entities |
 | | JWT Decoder | Decode JWT tokens to readable JSON |
-| 🔤 **String** | Hash Generator | MD5, SHA-1, SHA-2, SHA-3, BLAKE2b digests |
+| | JWT Encoder / Verifier | Sign tokens (HS, RS, PS, ES256/384, EdDSA) and verify signatures with a secret or PEM key; checks `exp` / `nbf` |
+| 🔤 **String** | Case Converter | camelCase, PascalCase, snake_case, kebab-case, Train-Case, dot.case… line by line |
+| | Hash Generator | MD5, SHA-1, SHA-2, SHA-3, BLAKE2b digests |
+| | Password Generator | Secure random passwords with entropy estimate; check the strength of an existing one |
 | | Regex Tester | Live match highlighting, capture groups (numbered and named), replace with `$1` / `${name}` |
 | | Text Diff | Compare two texts: colored unified diff, stats, ignore whitespace / case |
+| | Text Inspector | Characters, bytes, words, lines, line endings; highlights invisible and special Unicode characters |
 | | UUID / ULID | Generate UUID v4 / v7, ULID, in bulk and any format; inspect version and creation date |
 | 🧮 **Parsing** | Cron Parser | Explain a cron expression in plain English and list the next runs |
+| | JSONPath / jq Tester | Run JSONPath (RFC 9535) or jq filters on JSON |
+| | XPath Tester | Run XPath 1.0 expressions on XML |
 
-Every text tool shares the same layout: syntax-highlighted input and output side by side (stacked on narrow windows), one-click copy, and errors shown inline. Timestamp, UUID, Regex, Diff and Cron update live as you type.
+Every text tool shares the same layout: syntax-highlighted input and output side by side (stacked on narrow windows), one-click copy, and errors shown inline. Most tools (Timestamp, Regex, Diff, Cron, Color, Units, JSONPath / jq, XPath…) update live as you type.
 
 ## 🗄️ Spotlight: SQL Viewer
 
@@ -172,6 +181,8 @@ Every package is built from Linux with one command:
 ```bash
 nix develop .#windows -c wine build-windows-cross/DupotDevTools/bin/dupot-dev-tools.exe
 ```
+
+**Screenshots and demo GIF** (`./update_screenshots.sh`) are regenerated from the current code, also with Nix only (`nix develop .#screenshots`): the app plays a scripted demo ([`src/infrastructure/ui/demo.rs`](src/infrastructure/ui/demo.rs)) on the [`examples/sqlite/library.sql`](examples/sqlite/library.sql) database, inside an invisible headless Wayland session, and the script captures it into [`export/screenshots/`](export/screenshots/).
 
 Flatpak metadata (manifest, desktop file, AppStream, icons) lives in [`export/flatpak/`](export/flatpak/); the icons are generated from [`src/assets/logo.svg`](src/assets/logo.svg).
 

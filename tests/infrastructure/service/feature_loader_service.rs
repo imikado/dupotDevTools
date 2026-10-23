@@ -25,6 +25,7 @@ fn features_in_section_are_filtered_and_sorted() {
             "base64_encoding",
             "html_encoding",
             "jwt_decode",
+            "jwt_sign",
             "url_encoding"
         ]
     );
