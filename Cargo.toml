@@ -1,6 +1,6 @@
 [package]
 name = "dupot-dev-tools"
-version = "2.1.3"
+version = "2.1.4"
 edition = "2024"
 description = "The developer's Swiss Army knife for the Linux desktop"
 license = "LGPL-2.1-only"
@@ -42,6 +42,13 @@ ureq = "3"
 [profile.release]
 lto = true
 strip = true
+
+# Quick builds to test a package (`build_windows_cross.sh --fast`): no fat
+# LTO, which re-optimises every dependency at each link.
+[profile.release-fast]
+inherits = "release"
+lto = false
+incremental = true
 
 [build-dependencies]
 winresource = "0.1"

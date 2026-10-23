@@ -10,7 +10,7 @@ use adw::prelude::*;
 use gtk::{gdk, gio, glib, graphene};
 
 use self::criteria::CriteriaRow;
-use self::geometry::{facing_edge_x, hit_test, link_curve};
+use self::geometry::{clamp_to_span, facing_edge_x, hit_test, link_curve};
 use crate::domain::contract::connection_repository::ConnectionRepository;
 use crate::domain::contract::database_repository::DatabaseRepository;
 use crate::domain::entity::database::{
@@ -33,6 +33,11 @@ const SQL_SYNC_DELAY: std::time::Duration = std::time::Duration::from_millis(700
 const CARD_MAX_LIST_HEIGHT: i32 = 380;
 /// Height of one column row in a table card (its link button sets it).
 const CARD_ROW_HEIGHT: i32 = 34;
+/// Canvas size at 100 % zoom.
+const CANVAS_SIZE: (f64, f64) = (2000.0, 1200.0);
+const ZOOM_MIN: f64 = 0.3;
+const ZOOM_MAX: f64 = 2.0;
+const ZOOM_STEP: f64 = 0.1;
 
 pub struct Feature;
 
@@ -68,6 +73,10 @@ struct ColumnWidgets {
 struct TableCard {
     table: String,
     frame: gtk::Frame,
+    /// Scrolled list of the columns; rows scrolled out of it are hidden.
+    fields_scroll: gtk::ScrolledWindow,
+    /// Top-left corner on the canvas at 100 % zoom.
+    pos: Cell<(f64, f64)>,
     columns: Vec<ColumnWidgets>,
     foreign_keys: Vec<ForeignKey>,
 }
@@ -125,6 +134,8 @@ struct SqlViewer {
     generated_sql: RefCell<String>,
     /// Row cap of the built query: the typed query's `LIMIT`, if any.
     limit: Cell<usize>,
+    /// Canvas scale, 1.0 = 100 %.
+    zoom: Cell<f64>,
     /// Bumped on each SQL edit; only the latest one's timer redraws the canvas.
     sql_edit_serial: Cell<u32>,
 
@@ -140,6 +151,7 @@ struct SqlViewer {
     workspace: gtk::Box,
     disconnected_page: adw::StatusPage,
     status_lbl: gtk::Label,
+    zoom_btn: gtk::Button,
     fixed: gtk::Fixed,
     canvas_placeholder: gtk::Box,
     link_lines: gtk::DrawingArea,
@@ -196,24 +208,39 @@ fn popover_at(parent: &impl IsA<gtk::Widget>, x: f64, y: f64) -> gtk::Popover {
 
 /// Connects at the vertical height of the linked column, but always on the
 /// frame edge that faces the other table — so the line hugs the outside of
-/// both cards instead of cutting across whichever one sits in between.
+/// both cards instead of cutting across whichever one sits in between. A
+/// column scrolled out of its card's list attaches at the list's edge.
 fn edge_point(
     target: &gtk::DrawingArea,
     anchor: &gtk::ToggleButton,
-    frame: &gtk::Frame,
+    card: &TableCard,
     facing: &gtk::Frame,
 ) -> Option<(f64, f64)> {
     let a = anchor.compute_point(
         target,
         &graphene::Point::new(anchor.width() as f32 / 2.0, anchor.height() as f32 / 2.0),
     )?;
-    let f = frame.compute_point(target, &graphene::Point::zero())?;
-    let ff = facing.compute_point(target, &graphene::Point::zero())?;
-    let edge_x = facing_edge_x(
-        (f.x() as f64, frame.width() as f64),
-        (ff.x() as f64, facing.width() as f64),
+    // `(x, width)` on the canvas, zoom included.
+    let span = |frame: &gtk::Frame| {
+        let left = frame.compute_point(target, &graphene::Point::zero())?;
+        let right =
+            frame.compute_point(target, &graphene::Point::new(frame.width() as f32, 0.0))?;
+        Some((left.x() as f64, (right.x() - left.x()) as f64))
+    };
+    let list_top = card
+        .fields_scroll
+        .compute_point(target, &graphene::Point::zero())?;
+    let list_bottom = card.fields_scroll.compute_point(
+        target,
+        &graphene::Point::new(0.0, card.fields_scroll.height() as f32),
+    )?;
+    let edge_x = facing_edge_x(span(&card.frame)?, span(facing)?);
+    let y = clamp_to_span(
+        a.y() as f64,
+        list_top.y() as f64,
+        (list_bottom.y() - list_top.y()) as f64,
     );
-    Some((edge_x, a.y() as f64))
+    Some((edge_x, y))
 }
 
 macro_rules! with_viewer {
@@ -280,7 +307,7 @@ impl SqlViewer {
 
         // --- Diagram pane ---
         let fixed = gtk::Fixed::new();
-        fixed.set_size_request(2000, 1200);
+        fixed.set_size_request(CANVAS_SIZE.0 as i32, CANVAS_SIZE.1 as i32);
         fixed.add_css_class("view");
 
         let link_lines = gtk::DrawingArea::new();
@@ -528,11 +555,30 @@ impl SqlViewer {
             .sync_create()
             .build();
 
+        let zoom_out_btn = gtk::Button::builder()
+            .icon_name("zoom-out-symbolic")
+            .tooltip_text("Zoom out the tables (Ctrl+scroll)")
+            .build();
+        let zoom_btn = gtk::Button::builder()
+            .label("100%")
+            .tooltip_text("Reset the zoom")
+            .build();
+        let zoom_in_btn = gtk::Button::builder()
+            .icon_name("zoom-in-symbolic")
+            .tooltip_text("Zoom in the tables (Ctrl+scroll)")
+            .build();
+        let zoom_btns = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        zoom_btns.add_css_class("linked");
+        zoom_btns.append(&zoom_out_btn);
+        zoom_btns.append(&zoom_btn);
+        zoom_btns.append(&zoom_in_btn);
+
         let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         spacer.set_hexpand(true);
         toolbar.append(&conn_toggle);
         toolbar.append(&pane_toggles);
+        toolbar.append(&zoom_btns);
         toolbar.append(&spacer);
         toolbar.append(&joins_btn);
         toolbar.append(&generate_sql_btn);
@@ -571,6 +617,7 @@ impl SqlViewer {
             syncing: Cell::new(false),
             generated_sql: RefCell::default(),
             limit: Cell::new(MAX_RESULT_ROWS),
+            zoom: Cell::new(1.0),
             sql_edit_serial: Cell::new(0),
             conn_model,
             conn_dropdown,
@@ -582,6 +629,7 @@ impl SqlViewer {
             workspace,
             disconnected_page,
             status_lbl,
+            zoom_btn: zoom_btn.clone(),
             fixed,
             canvas_placeholder,
             link_lines,
@@ -611,6 +659,28 @@ impl SqlViewer {
         save_conns_btn.connect_clicked(with_viewer!(weak, |this| this.do_save_connections()));
         generate_sql_btn.connect_clicked(with_viewer!(weak, |this| this.do_generate_sql()));
         run_btn.connect_clicked(with_viewer!(weak, |this| this.do_run_query()));
+        zoom_out_btn
+            .connect_clicked(with_viewer!(weak, |this| this.set_zoom(this.zoom.get() - ZOOM_STEP)));
+        zoom_in_btn
+            .connect_clicked(with_viewer!(weak, |this| this.set_zoom(this.zoom.get() + ZOOM_STEP)));
+        zoom_btn.connect_clicked(with_viewer!(weak, |this| this.set_zoom(1.0)));
+        let zoom_scroll =
+            gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+        let w = weak.clone();
+        zoom_scroll.connect_scroll(move |ctrl, _, dy| {
+            let ctrl_held = ctrl
+                .current_event_state()
+                .contains(gdk::ModifierType::CONTROL_MASK);
+            match w.upgrade() {
+                Some(this) if ctrl_held => {
+                    this.set_zoom(this.zoom.get() - dy.signum() * ZOOM_STEP);
+                    glib::Propagation::Stop
+                }
+                _ => glib::Propagation::Proceed,
+            }
+        });
+        zoom_scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
+        canvas_scroll.add_controller(zoom_scroll);
         this.export_csv_btn
             .connect_clicked(with_viewer!(weak, |this| this.do_export_csv()));
 
@@ -692,8 +762,8 @@ impl SqlViewer {
         hitboxes.clear();
         for join in self.joins.borrow().iter() {
             let (l, rt) = (&join.left, &join.right);
-            let p1 = edge_point(&self.link_lines, &l.anchor, &l.card.frame, &rt.card.frame);
-            let p2 = edge_point(&self.link_lines, &rt.anchor, &rt.card.frame, &l.card.frame);
+            let p1 = edge_point(&self.link_lines, &l.anchor, &l.card, &rt.card.frame);
+            let p2 = edge_point(&self.link_lines, &rt.anchor, &rt.card, &l.card.frame);
             let (Some(from), Some(to)) = (p1, p2) else {
                 continue;
             };
@@ -989,6 +1059,14 @@ impl SqlViewer {
         fields_scroll.set_propagate_natural_width(true);
         fields_scroll.set_vexpand(true);
         fields_scroll.set_child(Some(&fields_box));
+        // Join lines follow their columns as the list scrolls.
+        fields_scroll
+            .vadjustment()
+            .connect_value_changed(glib::clone!(
+                #[weak(rename_to = link_lines)]
+                self.link_lines,
+                move |_| link_lines.queue_draw()
+            ));
 
         vbox.append(&header);
         vbox.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
@@ -1012,6 +1090,8 @@ impl SqlViewer {
         let card = Rc::new(TableCard {
             table: table.to_string(),
             frame: frame.clone(),
+            fields_scroll: fields_scroll.clone(),
+            pos: Cell::new((0.0, 0.0)),
             columns: column_widgets,
             foreign_keys,
         });
@@ -1047,31 +1127,41 @@ impl SqlViewer {
             }
         });
 
-        // Drag the header to move the card.
-        let start_pos = Rc::new(Cell::new((0.0, 0.0)));
+        // Drag the header to move the card. The pointer is followed on the
+        // canvas itself, so the card stays under it at any zoom.
+        let drag_start = Rc::new(Cell::new(((0.0, 0.0), (0.0, 0.0))));
+        let pointer_on_canvas = |gesture: &gtk::GestureDrag, this: &SqlViewer| {
+            let (x, y) = gesture.point(None)?;
+            let widget = gesture.widget()?;
+            let p = widget.compute_point(&this.fixed, &graphene::Point::new(x as f32, y as f32))?;
+            Some((p.x() as f64, p.y() as f64))
+        };
         let drag = gtk::GestureDrag::new();
-        drag.connect_drag_begin(glib::clone!(
-            #[strong]
-            start_pos,
-            #[weak]
-            frame,
-            #[weak(rename_to = fixed)]
-            self.fixed,
-            move |_, _, _| start_pos.set(fixed.child_position(&frame))
-        ));
-        drag.connect_drag_update(glib::clone!(
-            #[weak]
-            frame,
-            #[weak(rename_to = fixed)]
-            self.fixed,
-            #[weak(rename_to = link_lines)]
-            self.link_lines,
-            move |_, dx, dy| {
-                let (x, y) = start_pos.get();
-                fixed.move_(&frame, (x + dx).max(0.0), (y + dy).max(0.0));
-                link_lines.queue_draw();
+        let (w, wc, ds) = (weak.clone(), weak_card.clone(), Rc::clone(&drag_start));
+        drag.connect_drag_begin(move |gesture, _, _| {
+            if let (Some(this), Some(card)) = (w.upgrade(), wc.upgrade())
+                && let Some(pointer) = pointer_on_canvas(gesture, &this)
+            {
+                ds.set((card.pos.get(), pointer));
             }
-        ));
+        });
+        let (w, wc) = (weak.clone(), weak_card.clone());
+        drag.connect_drag_update(move |gesture, _, _| {
+            let (Some(this), Some(card)) = (w.upgrade(), wc.upgrade()) else {
+                return;
+            };
+            let Some((px, py)) = pointer_on_canvas(gesture, &this) else {
+                return;
+            };
+            let ((x, y), (sx, sy)) = drag_start.get();
+            let z = this.zoom.get();
+            this.move_card(
+                &card,
+                (x + (px - sx) / z).max(0.0),
+                (y + (py - sy) / z).max(0.0),
+            );
+            this.link_lines.queue_draw();
+        });
         header.add_controller(drag);
 
         // Drag the corner grip to resize the card.
@@ -1151,11 +1241,37 @@ impl SqlViewer {
             }
         };
         let card = self.build_table_card(table, &columns, foreign_keys);
-        self.fixed.put(&card.frame, x, y);
+        self.fixed.put(&card.frame, 0.0, 0.0);
+        self.move_card(&card, x, y);
         self.table_cards.borrow_mut().push(Rc::clone(&card));
         self.update_canvas_placeholder();
         self.sync_criteria_rows();
         Some(card)
+    }
+
+    /// Places a card at `(x, y)` in unzoomed canvas coordinates.
+    fn move_card(&self, card: &TableCard, x: f64, y: f64) {
+        card.pos.set((x, y));
+        let z = self.zoom.get();
+        let transform = gtk::gsk::Transform::new()
+            .translate(&graphene::Point::new((x * z) as f32, (y * z) as f32))
+            .scale(z as f32, z as f32);
+        self.fixed
+            .set_child_transform(&card.frame, Some(&transform));
+    }
+
+    fn set_zoom(&self, zoom: f64) {
+        // Rounded so repeated steps land on whole percents.
+        let zoom = (zoom.clamp(ZOOM_MIN, ZOOM_MAX) * 100.0).round() / 100.0;
+        self.zoom.set(zoom);
+        for card in self.table_cards.borrow().iter() {
+            let (x, y) = card.pos.get();
+            self.move_card(card, x, y);
+        }
+        self.fixed
+            .set_size_request((CANVAS_SIZE.0 * zoom) as i32, (CANVAS_SIZE.1 * zoom) as i32);
+        self.zoom_btn.set_label(&format!("{:.0}%", zoom * 100.0));
+        self.link_lines.queue_draw();
     }
 
     /// Free spot for a card placed by the code: a grid, row after row.
@@ -1288,7 +1404,9 @@ impl SqlViewer {
                     .ok()
                     .and_then(|i| tables.get(i));
                 if let (Some(this), Some(table)) = (weak.upgrade(), table) {
-                    this.add_table_card(table, x, y);
+                    // The click is in zoomed canvas coordinates.
+                    let z = this.zoom.get();
+                    this.add_table_card(table, x / z, y / z);
                 }
             }
         ));

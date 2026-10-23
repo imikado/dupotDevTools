@@ -1,5 +1,5 @@
 use dupot_dev_tools::infrastructure::ui::features::database::sql_viewer::geometry::{
-    bezier_point, facing_edge_x, hit_test, link_curve,
+    bezier_point, clamp_to_span, facing_edge_x, hit_test, link_curve,
 };
 
 #[test]
@@ -36,4 +36,12 @@ fn hit_test_picks_the_closest_curve_within_tolerance() {
     assert_eq!(hit_test(&curves, 50.0, 16.0, 7.0), Some(1));
     assert_eq!(hit_test(&curves, 50.0, 60.0, 7.0), None);
     assert_eq!(hit_test(&[], 0.0, 0.0, 7.0), None);
+}
+
+#[test]
+fn clamp_to_span_keeps_a_hidden_row_on_the_list_edge() {
+    assert_eq!(clamp_to_span(50.0, 0.0, 100.0), 50.0);
+    assert_eq!(clamp_to_span(500.0, 0.0, 100.0), 94.0);
+    assert_eq!(clamp_to_span(-30.0, 0.0, 100.0), 6.0);
+    assert_eq!(clamp_to_span(500.0, 0.0, 0.0), 500.0);
 }

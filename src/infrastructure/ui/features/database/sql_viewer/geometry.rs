@@ -37,6 +37,16 @@ pub fn facing_edge_x(own: (f64, f64), facing: (f64, f64)) -> f64 {
     }
 }
 
+/// `y` kept within `[top, top + height]`, inset so a line never attaches on
+/// the very border; `y` as is when the span is too small to inset.
+pub fn clamp_to_span(y: f64, top: f64, height: f64) -> f64 {
+    const INSET: f64 = 6.0;
+    if height <= 2.0 * INSET {
+        return y;
+    }
+    y.clamp(top + INSET, top + height - INSET)
+}
+
 /// Index of the curve passing closest to `(x, y)`, if any lies within
 /// `tolerance` pixels (sampled at 21 points per curve).
 pub fn hit_test(curves: &[[Point; 4]], x: f64, y: f64, tolerance: f64) -> Option<usize> {

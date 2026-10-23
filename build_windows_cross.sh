@@ -14,8 +14,10 @@
 #     lib/    gdk-pixbuf loaders + their cache (generated with Wine)
 #     share/  GSettings schemas, Adwaita + hicolor icons, GtkSourceView data
 #
-# Usage: ./build_windows_cross.sh [--refresh]
+# Usage: ./build_windows_cross.sh [--refresh] [--fast]
 #   --refresh   re-download the MSYS2 index and packages (else cached)
+#   --fast      test build: `release-fast` profile (no fat LTO, incremental),
+#               much quicker to rebuild but a larger, slightly slower exe
 
 set -euo pipefail
 
@@ -63,9 +65,14 @@ roots=(
     mingw-w64-ucrt-x86_64-crt
 )
 
-if [[ "${1:-}" == "--refresh" ]]; then
-    rm -rf "$cache_dir"
-fi
+profile="release"
+for arg in "$@"; do
+    case "$arg" in
+        --refresh) rm -rf "$cache_dir" ;;
+        --fast) profile="release-fast" ;;
+        *) echo "error: unknown option $arg" >&2; exit 2 ;;
+    esac
+done
 mkdir -p "$cache_dir"
 
 echo "=== Resolving MSYS2 packages ==="
@@ -109,18 +116,26 @@ for name in sorted(seen):
 mapfile -t packages < "$cache_dir/packages.txt"
 echo "${#packages[@]} packages"
 
-echo "=== Downloading and extracting into $sysroot ==="
-rm -rf "$sysroot"
-mkdir -p "$sysroot"
-for file in "${packages[@]}"; do
-    if [[ ! -f "$cache_dir/$file" ]]; then
-        curl -fsSL "$mirror/$file" -o "$cache_dir/$file.part"
-        mv "$cache_dir/$file.part" "$cache_dir/$file"
-    fi
-    zstd -dcq "$cache_dir/$file" | tar -x -C "$sysroot" --exclude='.*'
-done
+# The sysroot is kept between builds and only re-extracted when the package
+# list changes (new versions after --refresh, or new roots).
+sysroot_stamp="$sysroot/.packages"
+if cmp -s "$cache_dir/packages.txt" "$sysroot_stamp"; then
+    echo "=== Reusing $sysroot (same packages) ==="
+else
+    echo "=== Downloading and extracting into $sysroot ==="
+    rm -rf "$sysroot"
+    mkdir -p "$sysroot"
+    for file in "${packages[@]}"; do
+        if [[ ! -f "$cache_dir/$file" ]]; then
+            curl -fsSL "$mirror/$file" -o "$cache_dir/$file.part"
+            mv "$cache_dir/$file.part" "$cache_dir/$file"
+        fi
+        zstd -dcq "$cache_dir/$file" | tar -x -C "$sysroot" --exclude='.*'
+    done
+    cp "$cache_dir/packages.txt" "$sysroot_stamp"
+fi
 
-echo "=== Cross-compiling ($target, release) ==="
+echo "=== Cross-compiling ($target) ==="
 # The .pc files say prefix=/ucrt64; the sysroot makes -I/-L point inside it.
 export PKG_CONFIG_ALLOW_CROSS=1
 export PKG_CONFIG_SYSROOT_DIR="$repo_root/$sysroot"
@@ -129,12 +144,14 @@ export PKG_CONFIG_PATH=""
 # Link against the MSYS2 C runtime (crt2.o, libmingw32/ex, libpthread) rather
 # than the Nix MinGW one, so it matches what the GTK DLLs were built with.
 export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS="-C link-arg=-B$repo_root/$prefix/lib"
-cargo build --release --locked --target "$target"
+echo "profile: $profile"
+# Lowest CPU priority: the machine stays usable during the build.
+nice -n 19 cargo build --profile "$profile" --locked --target "$target"
 
 echo "=== Assembling bundle in $bundle ==="
 rm -rf "$bundle"
 mkdir -p "$bundle/bin" "$bundle/lib" "$bundle/share/glib-2.0/schemas" "$bundle/share/icons"
-cp "target/$target/release/$exe_name" "$bundle/bin/"
+cp "target/$target/$profile/$exe_name" "$bundle/bin/"
 cp -r "$prefix/lib/gdk-pixbuf-2.0" "$bundle/lib/"
 
 # DLLs come from MSYS2 only (the exe links the MSYS2 C runtime statically).
