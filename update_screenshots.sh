@@ -41,10 +41,11 @@ for arg in "$@"; do
     esac
 done
 
-# Window size of the screenshots; the GIF is scaled down to gif_width.
+# Window size of the captures (the demo lays the SQL viewer canvas out for
+# it); screenshots and GIF are then scaled down to out_width.
 width=1600
 height=1000
-gif_width=1200
+out_width=1000
 gif_fps=12
 dist_dir="export/screenshots"
 
@@ -172,12 +173,13 @@ mkdir -p "$dist_dir"
 count=0
 for png in "$shots"/*.png; do
     [[ -e "$png" ]] || continue
-    cp "$png" "$dist_dir/"
+    ffmpeg -loglevel error -y -i "$png" -vf "scale=${out_width}:-1:flags=lanczos" \
+        "$dist_dir/$(basename "$png")"
     count=$((count + 1))
 done
 if [[ -s "$work/demo.mp4" ]]; then
     ffmpeg -loglevel error -y -i "$work/demo.mp4" -vf \
-        "fps=${gif_fps},scale=${gif_width}:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
+        "fps=${gif_fps},scale=${out_width}:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
         -loop 0 "$dist_dir/promo.gif"
     echo "promo.gif: $(du -h "$dist_dir/promo.gif" | cut -f1)"
 else
