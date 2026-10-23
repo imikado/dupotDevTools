@@ -4,7 +4,9 @@ use std::rc::{Rc, Weak};
 use adw::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
 
+use crate::domain::contract::release_repository::ReleaseRepository;
 use crate::domain::entity::app_info::APP;
+use crate::infrastructure::api::github_release_api::GithubReleaseApi;
 use crate::infrastructure::service::feature_loader_service::FeatureLoaderService;
 use crate::infrastructure::ui::feature_contract::LeaveGuard;
 use crate::infrastructure::ui::features::RegisteredFeature;
@@ -246,6 +248,7 @@ fn feature_icon_bubble(feature: &RegisteredFeature) -> gtk::Box {
 
 struct MainWindow {
     window: adw::ApplicationWindow,
+    toast_overlay: adw::ToastOverlay,
     nav_view: adw::NavigationView,
     split_view: adw::OverlaySplitView,
     content_bin: adw::Bin,
@@ -270,7 +273,9 @@ impl MainWindow {
             .height_request(400)
             .build();
         let nav_view = adw::NavigationView::new();
-        window.set_content(Some(&nav_view));
+        let toast_overlay = adw::ToastOverlay::new();
+        toast_overlay.set_child(Some(&nav_view));
+        window.set_content(Some(&toast_overlay));
 
         let split_view = adw::OverlaySplitView::builder()
             .min_sidebar_width(200.0)
@@ -285,6 +290,7 @@ impl MainWindow {
 
         let this = Rc::new(Self {
             window,
+            toast_overlay,
             nav_view,
             split_view,
             content_bin: adw::Bin::new(),
@@ -301,7 +307,38 @@ impl MainWindow {
         this.nav_view
             .push(&adw::NavigationPage::new(&this.split_view, APP_NAME));
         this.refresh();
+        this.check_for_update();
         this
+    }
+
+    /// Looks up the latest release in the background and, when it is newer
+    /// than this build, offers to download it. Offline, nothing is shown.
+    fn check_for_update(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let Ok(Ok(release)) = gio::spawn_blocking(|| GithubReleaseApi.latest_release()).await
+            else {
+                return;
+            };
+            if !release.is_newer_than(APP.build.version) {
+                return;
+            }
+            let Some(this) = weak.upgrade() else { return };
+            let toast = adw::Toast::builder()
+                .title(format!("Version {} is available", release.version))
+                .button_label("Download")
+                .timeout(0)
+                .build();
+            let window = this.window.downgrade();
+            toast.connect_button_clicked(move |_| {
+                gtk::UriLauncher::new(&release.url).launch(
+                    window.upgrade().as_ref(),
+                    gio::Cancellable::NONE,
+                    |_| {},
+                );
+            });
+            this.toast_overlay.add_toast(toast);
+        });
     }
 
     fn install_actions(self: &Rc<Self>) {

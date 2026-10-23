@@ -37,6 +37,7 @@ mysql = { version = "28", default-features = false, features = ["minimal-rust"] 
 sqlparser = "0.63.0"
 tokio-postgres-rustls = "0.14.0"
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+ureq = "3"
 
 [profile.release]
 lto = true
