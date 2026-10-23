@@ -123,6 +123,8 @@ struct SqlViewer {
     /// Last SQL written from the canvas; while the editor still holds it,
     /// canvas edits rewrite it.
     generated_sql: RefCell<String>,
+    /// Row cap of the built query: the typed query's `LIMIT`, if any.
+    limit: Cell<usize>,
     /// Bumped on each SQL edit; only the latest one's timer redraws the canvas.
     sql_edit_serial: Cell<u32>,
 
@@ -131,6 +133,12 @@ struct SqlViewer {
     connect_btn: gtk::Button,
     new_conn_btn: gtk::Button,
     conn_state_lbl: gtk::Label,
+    /// Holds the connection bar, folded away once connected.
+    conn_revealer: gtk::Revealer,
+    conn_toggle: gtk::ToggleButton,
+    /// Toolbar and panes, shown only while connected.
+    workspace: gtk::Box,
+    disconnected_page: adw::StatusPage,
     status_lbl: gtk::Label,
     fixed: gtk::Fixed,
     canvas_placeholder: gtk::Box,
@@ -259,6 +267,10 @@ impl SqlViewer {
         conn_bar.append(&conn_dropdown);
         conn_bar.append(&conn_file_btns);
         conn_bar.append(&connect_btn);
+        let conn_revealer = gtk::Revealer::builder()
+            .child(&conn_bar)
+            .reveal_child(true)
+            .build();
 
         let status_lbl = gtk::Label::new(None);
         status_lbl.add_css_class("dim-label");
@@ -477,6 +489,8 @@ impl SqlViewer {
             let sync = sync_paneds.clone();
             pane.connect_visible_notify(move |_| sync());
         }
+        // The designer writes the query: its text is shown on demand.
+        sql_toggle.set_active(false);
 
         let joins_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
         joins_box.set_margin_top(6);
@@ -504,19 +518,42 @@ impl SqlViewer {
             .build();
         run_btn.add_css_class("suggested-action");
 
+        let conn_toggle = gtk::ToggleButton::builder()
+            .icon_name("network-server-symbolic")
+            .tooltip_text("Show or hide the connection")
+            .build();
+        conn_revealer
+            .bind_property("reveal-child", &conn_toggle, "active")
+            .bidirectional()
+            .sync_create()
+            .build();
+
         let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         spacer.set_hexpand(true);
+        toolbar.append(&conn_toggle);
         toolbar.append(&pane_toggles);
         toolbar.append(&spacer);
         toolbar.append(&joins_btn);
         toolbar.append(&generate_sql_btn);
         toolbar.append(&run_btn);
 
-        root.append(&conn_bar);
+        let workspace = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        workspace.set_vexpand(true);
+        workspace.append(&toolbar);
+        workspace.append(&panes);
+
+        let disconnected_page = adw::StatusPage::builder()
+            .icon_name("network-server-symbolic")
+            .title("Not connected")
+            .description("Choose a connection above, or create one with +, then Connect.")
+            .vexpand(true)
+            .build();
+
+        root.append(&conn_revealer);
         root.append(&status_lbl);
-        root.append(&toolbar);
-        root.append(&panes);
+        root.append(&disconnected_page);
+        root.append(&workspace);
 
         let this = Rc::new(Self {
             db: RefCell::new(Box::new(DatabaseApi::default())),
@@ -533,12 +570,17 @@ impl SqlViewer {
             criteria_rows: RefCell::default(),
             syncing: Cell::new(false),
             generated_sql: RefCell::default(),
+            limit: Cell::new(MAX_RESULT_ROWS),
             sql_edit_serial: Cell::new(0),
             conn_model,
             conn_dropdown,
             connect_btn: connect_btn.clone(),
             new_conn_btn,
             conn_state_lbl,
+            conn_revealer,
+            conn_toggle,
+            workspace,
+            disconnected_page,
             status_lbl,
             fixed,
             canvas_placeholder,
@@ -1391,7 +1433,7 @@ impl SqlViewer {
             .collect();
         let criteria = self.criteria_snapshot(&cards);
         let kind = self.db.borrow().kind().unwrap_or(DbKind::Sqlite);
-        logic::build_select(kind, &tables, &joins, &criteria, MAX_RESULT_ROWS)
+        logic::build_select(kind, &tables, &joins, &criteria, self.limit.get())
             .map(|sql| sql_format::format(&sql))
     }
 
@@ -1413,7 +1455,10 @@ impl SqlViewer {
         }
         let current = self.sql_text();
         if !current.trim().is_empty() && current != *self.generated_sql.borrow() {
-            return;
+            return self.set_status(
+                "The SQL query was edited by hand, so the designer doesn't rewrite it — \
+                 use Rebuild to apply its changes.",
+            );
         }
         match self.build_query() {
             Ok(sql) => self.set_generated_sql(&sql),
@@ -1496,6 +1541,7 @@ impl SqlViewer {
         if unknown.is_empty() && parsed.complete {
             // The designer holds the whole query: its edits may rewrite it.
             *self.generated_sql.borrow_mut() = sql;
+            self.limit.set(parsed.limit.unwrap_or(MAX_RESULT_ROWS));
             self.set_status("Canvas and criteria redrawn from the SQL query.");
         } else if unknown.is_empty() {
             self.set_status(
@@ -1592,6 +1638,11 @@ impl SqlViewer {
                 }
                 Err(e) => return self.set_error(e.message()),
             }
+        }
+        if let Some(kind) = self.db.borrow().kind()
+            && let Err(e) = logic::check_syntax(kind, &sql)
+        {
+            return self.set_error(e.message());
         }
         let result = self.db.borrow_mut().execute(&sql);
         let (columns, rows) = match result {
@@ -1830,6 +1881,21 @@ impl SqlViewer {
         // Switching connection while connected would leave the canvas stale.
         self.conn_dropdown
             .set_sensitive(!connected && self.conn_model.n_items() > 0);
+        // On (dis)connecting only: connected, the bar folds away behind
+        // `conn_toggle`; disconnected, it is all there is to use.
+        if self.workspace.is_visible() != connected {
+            self.conn_revealer.set_reveal_child(!connected);
+        }
+        self.workspace.set_visible(connected);
+        self.disconnected_page.set_visible(!connected);
+        let name = self
+            .conn_model
+            .string(self.conn_dropdown.selected())
+            .filter(|_| connected);
+        self.conn_toggle.set_tooltip_text(Some(&match name {
+            Some(name) => format!("Connection “{name}” — show or hide"),
+            None => "Show or hide the connection".to_string(),
+        }));
     }
 
     fn do_connect(self: &Rc<Self>) {

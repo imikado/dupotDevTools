@@ -1,6 +1,6 @@
 [package]
 name = "dupot-dev-tools"
-version = "2.1.2"
+version = "2.1.3"
 edition = "2024"
 description = "The developer's Swiss Army knife for the Linux desktop"
 license = "LGPL-2.1-only"

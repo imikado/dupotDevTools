@@ -1,7 +1,7 @@
 use dupot_dev_tools::domain::entity::database::DbKind;
 use dupot_dev_tools::domain::feature::database::sql_viewer::{
-    CanvasJoin, CanvasTable, MAX_RESULT_ROWS, build_select, is_truncated, parse_select,
-    quote_ident, to_csv,
+    CanvasJoin, CanvasTable, MAX_RESULT_ROWS, build_select, check_syntax, is_truncated,
+    parse_select, quote_ident, to_csv,
 };
 
 fn table(name: &str, columns: &[&str]) -> CanvasTable {
@@ -369,7 +369,7 @@ mod criteria {
             "SELECT count(a.id) FROM author a",
             "SELECT a.name FROM author a LEFT JOIN book b ON b.author_id = a.id",
             "SELECT a.name FROM author a WHERE a.id > 1 AND a.id < 5",
-            "SELECT a.name FROM author a LIMIT 10",
+            "SELECT a.name FROM author a LIMIT 10 OFFSET 5",
         ] {
             let parsed = parse_select(DbKind::Postgresql, sql).unwrap();
             assert!(!parsed.complete, "{sql}");
@@ -401,4 +401,33 @@ fn self_join_round_trips_through_build_and_parse() {
     assert_eq!(parsed.tables.len(), 2);
     assert_eq!(parsed.joins, [join(0, "id", 1, "parent_id")]);
     assert!(parsed.complete);
+}
+
+#[test]
+fn parse_select_keeps_a_limit_within_the_cap() {
+    let parsed = parse_select(DbKind::Sqlite, "SELECT * FROM book LIMIT 10").unwrap();
+    assert_eq!(parsed.limit, Some(10));
+    assert!(parsed.complete);
+}
+
+#[test]
+fn parse_select_flags_a_limit_over_the_cap() {
+    let sql = format!("SELECT * FROM book LIMIT {}", MAX_RESULT_ROWS + 1);
+    let parsed = parse_select(DbKind::Sqlite, &sql).unwrap();
+    assert_eq!(parsed.limit, None);
+    assert!(!parsed.complete);
+}
+
+#[test]
+fn check_syntax_accepts_valid_sql() {
+    assert!(check_syntax(DbKind::Postgresql, "SELECT id FROM book WHERE price > 8").is_ok());
+    assert!(check_syntax(DbKind::Sqlite, "PRAGMA table_info('book')").is_ok());
+    assert!(check_syntax(DbKind::Mysql, "SELECT `id` FROM `book` LIMIT 5").is_ok());
+}
+
+#[test]
+fn check_syntax_reports_typos() {
+    let error = check_syntax(DbKind::Postgresql, "SELEC id FROM book").unwrap_err();
+    assert!(error.message().starts_with("SQL syntax error:"));
+    assert!(check_syntax(DbKind::Sqlite, "SELECT id FROM book WHERE").is_err());
 }

@@ -302,22 +302,35 @@ pub struct ParsedSelect {
     pub unqualified_columns: Vec<String>,
     /// Aliases, filters and sorts, with `table` indexing `tables`.
     pub criteria: Vec<ColumnCriteria>,
+    /// `LIMIT n`, when the query has one within `MAX_RESULT_ROWS`.
+    pub limit: Option<usize>,
     /// True when the canvas and criteria hold the whole query, so building
     /// it back from them loses nothing (bar formatting and the row cap).
     pub complete: bool,
+}
+
+fn parse_statements(kind: DbKind, sql: &str) -> DomainResult<Vec<Statement>> {
+    let dialect: Box<dyn Dialect> = match kind {
+        DbKind::Sqlite => Box::new(SQLiteDialect {}),
+        DbKind::Postgresql => Box::new(PostgreSqlDialect {}),
+        DbKind::Mysql => Box::new(MySqlDialect {}),
+    };
+    Parser::parse_sql(dialect.as_ref(), sql).map_err(|e| DomainError::new(e.to_string()))
+}
+
+/// Checks the SQL syntax for the database dialect, so a typo is reported
+/// before anything is sent to the server.
+pub fn check_syntax(kind: DbKind, sql: &str) -> DomainResult<()> {
+    parse_statements(kind, sql)
+        .map(|_| ())
+        .map_err(|e| DomainError::new(format!("SQL syntax error: {}", e.message())))
 }
 
 /// Reads a single `SELECT … FROM table [JOIN …]` query. Clauses the canvas
 /// can't show are skipped and clear `complete`; subqueries and set
 /// operations are refused.
 pub fn parse_select(kind: DbKind, sql: &str) -> DomainResult<ParsedSelect> {
-    let dialect: Box<dyn Dialect> = match kind {
-        DbKind::Sqlite => Box::new(SQLiteDialect {}),
-        DbKind::Postgresql => Box::new(PostgreSqlDialect {}),
-        DbKind::Mysql => Box::new(MySqlDialect {}),
-    };
-    let statements =
-        Parser::parse_sql(dialect.as_ref(), sql).map_err(|e| DomainError::new(e.to_string()))?;
+    let statements = parse_statements(kind, sql)?;
     let not_drawable = || DomainError::new("Only a single SELECT on tables can be drawn.");
     let [Statement::Query(query)] = statements.as_slice() else {
         return Err(not_drawable());
@@ -339,7 +352,13 @@ pub fn parse_select(kind: DbKind, sql: &str) -> DomainResult<ParsedSelect> {
             limit: Some(Expr::Value(v)),
             offset: None,
             limit_by,
-        }) => limit_by.is_empty() && v.value == Value::Number(MAX_RESULT_ROWS.to_string(), false),
+        }) if limit_by.is_empty() => {
+            reader.parsed.limit = match &v.value {
+                Value::Number(n, false) => n.parse().ok().filter(|&n| n <= MAX_RESULT_ROWS),
+                _ => None,
+            };
+            reader.parsed.limit.is_some()
+        }
         Some(_) => false,
     };
     let has_group_by = match &select.group_by {
