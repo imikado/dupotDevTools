@@ -1,7 +1,13 @@
 //! SQLite / PostgreSQL / MySQL implementation of the domain's
 //! `DatabaseRepository`.
 
+use std::sync::Arc;
+
 use mysql::prelude::Queryable;
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::crypto::{CryptoProvider, verify_tls12_signature, verify_tls13_signature};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use rustls::{DigitallySignedStruct, SignatureScheme};
 
 use crate::domain::contract::database_repository::DatabaseRepository;
 use crate::domain::entity::database::{Cell, ConnectionConfig, DbKind, ForeignKey, QueryResult};
@@ -36,7 +42,7 @@ impl DatabaseRepository for DatabaseApi {
                     .dbname(config.param("database"))
                     .user(config.param("user"))
                     .password(config.param("password"));
-                Connection::Postgresql(pg.connect(postgres::NoTls)?)
+                Connection::Postgresql(pg.connect(postgres_tls()?)?)
             }
             DbKind::Mysql => {
                 let database = config.param("database");
@@ -194,6 +200,60 @@ fn sqlite_execute(conn: &rusqlite::Connection, sql: &str) -> rusqlite::Result<Qu
         out.push(cells);
     }
     Ok((columns, out))
+}
+
+/// TLS for PostgreSQL. The default `sslmode=prefer` tries TLS first and falls
+/// back to plain text, so servers that require encryption (`hostssl` lines in
+/// pg_hba.conf) accept the connection. Like libpq's `prefer` / `require`, the
+/// server certificate is not verified: dev servers mostly use self-signed ones.
+fn postgres_tls() -> DomainResult<tokio_postgres_rustls::MakeRustlsConnect> {
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = rustls::ClientConfig::builder_with_provider(provider.clone())
+        .with_safe_default_protocol_versions()
+        .map_err(|e| DomainError::new(format!("TLS setup failed: {e}")))?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(AcceptAnyCert(provider)))
+        .with_no_client_auth();
+    Ok(tokio_postgres_rustls::MakeRustlsConnect::new(config))
+}
+
+/// Accepts any server certificate but still checks the handshake signatures.
+#[derive(Debug)]
+struct AcceptAnyCert(Arc<CryptoProvider>);
+
+impl ServerCertVerifier for AcceptAnyCert {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        verify_tls12_signature(message, cert, dss, &self.0.signature_verification_algorithms)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        verify_tls13_signature(message, cert, dss, &self.0.signature_verification_algorithms)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.0.signature_verification_algorithms.supported_schemes()
+    }
 }
 
 fn postgres_execute(
