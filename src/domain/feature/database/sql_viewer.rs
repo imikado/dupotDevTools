@@ -294,7 +294,7 @@ pub struct ParsedTable {
 /// What of a SELECT can be drawn on the canvas.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ParsedSelect {
-    /// Each table once, in FROM order.
+    /// Each table occurrence (a self-join lists it twice), in FROM order.
     pub tables: Vec<ParsedTable>,
     /// Column equalities between two tables, from `ON`, `USING` and `WHERE`.
     pub joins: Vec<CanvasJoin>,
@@ -457,17 +457,13 @@ impl Reader {
             return None;
         };
         let table = last_ident(name)?;
-        let index = match self.parsed.tables.iter().position(|t| t.table == table) {
-            Some(i) => i,
-            None => {
-                self.parsed.tables.push(ParsedTable {
-                    table: table.clone(),
-                    columns: Some(vec![]),
-                });
-                self.parsed.tables.len() - 1
-            }
-        };
-        self.names.insert(table.to_lowercase(), index);
+        // Each occurrence is its own table, so a self-join keeps both sides.
+        self.parsed.tables.push(ParsedTable {
+            table: table.clone(),
+            columns: Some(vec![]),
+        });
+        let index = self.parsed.tables.len() - 1;
+        self.names.entry(table.to_lowercase()).or_insert(index);
         if let Some(alias) = alias {
             self.names.insert(alias.name.value.to_lowercase(), index);
         }

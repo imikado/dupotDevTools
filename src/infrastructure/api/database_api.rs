@@ -108,7 +108,7 @@ impl DatabaseRepository for DatabaseApi {
             Some(DbKind::Sqlite) => format!("PRAGMA table_info('{}')", table.replace('\'', "''")),
             Some(DbKind::Postgresql) => format!(
                 "SELECT column_name::text, data_type::text FROM information_schema.columns \
-                 WHERE table_name = '{}' ORDER BY ordinal_position",
+                 WHERE table_schema = 'public' AND table_name = '{}' ORDER BY ordinal_position",
                 table.replace('\'', "''")
             ),
             Some(DbKind::Mysql) => format!("SHOW COLUMNS FROM `{}`", table.replace('`', "``")),
@@ -239,7 +239,12 @@ impl ServerCertVerifier for AcceptAnyCert {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls12_signature(message, cert, dss, &self.0.signature_verification_algorithms)
+        verify_tls12_signature(
+            message,
+            cert,
+            dss,
+            &self.0.signature_verification_algorithms,
+        )
     }
 
     fn verify_tls13_signature(
@@ -248,7 +253,12 @@ impl ServerCertVerifier for AcceptAnyCert {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls13_signature(message, cert, dss, &self.0.signature_verification_algorithms)
+        verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &self.0.signature_verification_algorithms,
+        )
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {

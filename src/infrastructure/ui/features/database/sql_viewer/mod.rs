@@ -2,6 +2,7 @@ mod criteria;
 pub mod geometry;
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::{Rc, Weak};
 
@@ -1511,13 +1512,22 @@ impl SqlViewer {
 
     /// `known[i]` is the database's name for `parsed.tables[i]`, if it exists.
     fn apply_parsed_select(self: &Rc<Self>, parsed: &ParsedSelect, known: &[Option<String>]) {
-        let stale: Vec<Rc<TableCard>> = self
-            .table_cards
-            .borrow()
-            .iter()
-            .filter(|c| !known.iter().flatten().any(|k| *k == c.table))
-            .cloned()
-            .collect();
+        // The n-th occurrence of a table in the query is its n-th card, so a
+        // self-join keeps one card per side; cards beyond the query's count go.
+        let occurrences = |name: &str| known.iter().flatten().filter(|k| *k == name).count();
+        let stale: Vec<Rc<TableCard>> = {
+            let mut seen: HashMap<String, usize> = HashMap::new();
+            self.table_cards
+                .borrow()
+                .iter()
+                .filter(|c| {
+                    let n = seen.entry(c.table.clone()).or_default();
+                    *n += 1;
+                    *n > occurrences(&c.table)
+                })
+                .cloned()
+                .collect()
+        };
         for card in &stale {
             self.remove_table_card(card);
         }
@@ -1527,16 +1537,20 @@ impl SqlViewer {
         }
         self.pending_link.borrow_mut().take();
 
+        let mut used: HashMap<String, usize> = HashMap::new();
         let cards: Vec<Option<Rc<TableCard>>> = known
             .iter()
             .map(|name| {
                 let name = name.as_ref()?;
+                let nth = used.entry(name.clone()).or_default();
                 let existing = self
                     .table_cards
                     .borrow()
                     .iter()
-                    .find(|c| c.table == *name)
+                    .filter(|c| c.table == *name)
+                    .nth(*nth)
                     .cloned();
+                *nth += 1;
                 existing.or_else(|| {
                     let (x, y) = self.next_card_position();
                     self.place_table_card(name, x, y)

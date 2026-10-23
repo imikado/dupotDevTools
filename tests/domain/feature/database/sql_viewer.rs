@@ -1,6 +1,7 @@
 use dupot_dev_tools::domain::entity::database::DbKind;
 use dupot_dev_tools::domain::feature::database::sql_viewer::{
-    CanvasJoin, CanvasTable, MAX_RESULT_ROWS, build_select, is_truncated, quote_ident, to_csv,
+    CanvasJoin, CanvasTable, MAX_RESULT_ROWS, build_select, is_truncated, parse_select,
+    quote_ident, to_csv,
 };
 
 fn table(name: &str, columns: &[&str]) -> CanvasTable {
@@ -376,4 +377,28 @@ mod criteria {
         let simple = parse_select(DbKind::Postgresql, "SELECT name FROM author WHERE id > 1");
         assert!(simple.unwrap().complete);
     }
+}
+
+#[test]
+fn parse_select_keeps_both_sides_of_a_self_join() {
+    let parsed = parse_select(
+        DbKind::Postgresql,
+        "SELECT t1.name, t2.name FROM users AS t1 INNER JOIN users AS t2 ON t2.parent_id = t1.id",
+    )
+    .unwrap();
+    let tables: Vec<&str> = parsed.tables.iter().map(|t| t.table.as_str()).collect();
+    assert_eq!(tables, ["users", "users"]);
+    assert_eq!(parsed.joins, [join(1, "parent_id", 0, "id")]);
+    assert!(parsed.complete);
+}
+
+#[test]
+fn self_join_round_trips_through_build_and_parse() {
+    let tables = [table("users", &["name"]), table("users", &["name"])];
+    let joins = [join(1, "parent_id", 0, "id")];
+    let sql = build_select(DbKind::Sqlite, &tables, &joins, &[], MAX_RESULT_ROWS).unwrap();
+    let parsed = parse_select(DbKind::Sqlite, &sql).unwrap();
+    assert_eq!(parsed.tables.len(), 2);
+    assert_eq!(parsed.joins, [join(0, "id", 1, "parent_id")]);
+    assert!(parsed.complete);
 }
